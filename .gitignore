@@ -1,0 +1,43 @@
+# Next.js
+.next/
+out/
+build/
+node_modules/
+
+# Env
+.env*.local
+.env
+
+# Foundry
+cache/
+broadcast/
+artifacts/
+
+# Vercel
+.vercel
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Local
+PULSE.md
+.conductor-state.json
+.deploy-state.json
+pipeline-log.md
+.debug-state.json
+.wire-state.json
+.verify-state.json
+.stress-test-state.json
+.polish-state.json
+.design-forge-state.json
+.livetest-state.json
+
+# Build/skill state files
+.build-state.json
+.forge-state.json
+.conductor-lock/

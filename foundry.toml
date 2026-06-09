@@ -1,0 +1,14 @@
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+solc = "0.8.20"
+evm_version = "paris"
+# Shannon gas costs are ~15-22x local estimates; set explicit limit for forge script
+gas_limit = 50000000
+
+[rpc_endpoints]
+shannon = "https://dream-rpc.somnia.network"
+
+[etherscan]
+shannon = { key = "none", url = "https://shannon-explorer.somnia.network/api" }

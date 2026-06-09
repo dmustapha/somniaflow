@@ -1,0 +1,17 @@
+{
+  "colors": {
+    "primary": "#060c18",
+    "secondary": "#0d1a2e",
+    "accent": "#22d3ee",
+    "background": "#060c18",
+    "surface": "#0d1a2e",
+    "text": "#e2e8f0"
+  },
+  "fonts": {
+    "heading": "Playfair Display",
+    "body": "DM Sans",
+    "mono": "IBM Plex Mono"
+  },
+  "logoPath": "public/logo.svg",
+  "darkMode": true
+}
