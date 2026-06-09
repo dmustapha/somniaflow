@@ -25,7 +25,7 @@ let _relayStarted = false;
 function getSigner(): Wallet {
   const key = process.env.DEPLOYER_PRIVATE_KEY;
   if (!key) throw new Error("[Relay] DEPLOYER_PRIVATE_KEY not set");
-  const provider = new ethers.JsonRpcProvider(HTTP_RPC);
+  const provider = new ethers.JsonRpcProvider(HTTP_RPC, new ethers.Network("somnia-shannon", 50312), { staticNetwork: new ethers.Network("somnia-shannon", 50312) });
   return new Wallet(key, provider);
 }
 
@@ -39,7 +39,7 @@ export async function startRelayCoordinator(): Promise<void> {
   }
 
   // HTTP polling provider — WebSocketProvider fails network detection on Shannon
-  const provider       = new ethers.JsonRpcProvider(HTTP_RPC);
+  const provider       = new ethers.JsonRpcProvider(HTTP_RPC, new ethers.Network("somnia-shannon", 50312), { staticNetwork: new ethers.Network("somnia-shannon", 50312) });
   const pollContract   = new Contract(REGISTRY_ADDRESS, RELAY_ABI, provider);
   const signer         = getSigner();
   const signerContract = new Contract(REGISTRY_ADDRESS, RELAY_ABI, signer);

@@ -48,7 +48,7 @@ const _stepCosts        = new Map<string, Map<number, string>>();  // pipelineId
 const _stepTxHashes     = new Map<string, Map<number, string>>();  // pipelineId => step => txHash
 
 function getHttpProvider(): ethers.JsonRpcProvider {
-  if (!_httpProvider) _httpProvider = new ethers.JsonRpcProvider(HTTP_RPC);
+  if (!_httpProvider) _httpProvider = new ethers.JsonRpcProvider(HTTP_RPC, new ethers.Network("somnia-shannon", 50312), { staticNetwork: new ethers.Network("somnia-shannon", 50312) });
   return _httpProvider;
 }
 
