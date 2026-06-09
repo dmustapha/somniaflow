@@ -9,7 +9,7 @@ import type { PipelineStepInput, PipelineStateView, PipelineSSEEvent } from "@/t
 // [VERIFIED] — Shannon testnet HTTP RPC (WebSocket unstable; polling via JsonRpcProvider)
 const HTTP_RPC = "https://dream-rpc.somnia.network";
 
-const REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS!;
+const REGISTRY_ADDRESS = ethers.getAddress(process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6");
 const EXPLORER         = "https://shannon-explorer.somnia.network";
 
 // ABI — minimal set of functions and events needed by the integration layer
@@ -256,9 +256,9 @@ export async function getPipelineState(pipelineId: string): Promise<PipelineStat
     pipelineId,
     status:       statusMap[raw[1]] ?? "Idle",
     activeStep:   Number(raw[2]),
-    stepStatuses: (raw[3] as number[]).map(s => stepMap[s] ?? "idle"),
+    stepStatuses: Array.from(raw[3] as ArrayLike<number>).map(s => stepMap[Number(s)] ?? "idle"),
     sttBalance:   formatEther(raw[4]),
-    stepResults:  raw[5] as string[],
+    stepResults: Array.from(raw[5] as ArrayLike<unknown>).map(s => String(s)),
   };
 }
 
