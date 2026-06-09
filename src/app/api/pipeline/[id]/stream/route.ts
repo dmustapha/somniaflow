@@ -2,15 +2,20 @@
 import { NextRequest } from "next/server";
 import { pipelineBus } from "@/lib/event-bus";
 import { startEventListener } from "@/lib/pipeline-service";
+import { emitPipelineRun } from "@/lib/simulate";
 import type { PipelineSSEEvent } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const pipelineId = params.id;
 
-  // Ensure the WebSocket event listener is running
+  // autoSimulate: run simulation in THIS function so pipelineBus.emit and .on share the same process.
+  // Required on Vercel serverless where simulate POST and stream GET are isolated instances.
+  const autoSimulate = req.nextUrl.searchParams.get("autoSimulate") as "execute" | "skip" | null;
+
+  // Ensure the on-chain event listener is running
   await startEventListener();
 
   const encoder = new TextEncoder();
@@ -29,6 +34,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       }
 
       pipelineBus.on(pipelineId, write);
+
+      // If autoSimulate is set, run the simulation in THIS function instance so
+      // pipelineBus events are emitted and consumed in the same process (Vercel-safe).
+      if (autoSimulate === "execute" || autoSimulate === "skip") {
+        emitPipelineRun(pipelineId, autoSimulate).catch(err =>
+          console.error("[Stream] autoSimulate error:", err)
+        );
+      }
 
       // Send heartbeat to keep connection alive
       const heartbeat = setInterval(() => {

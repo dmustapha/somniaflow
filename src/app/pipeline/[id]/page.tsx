@@ -71,9 +71,12 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
 
   const meta = PIPELINE_META[params.id] ?? { name: `Demo ${params.id}`, tagline: "" };
 
-  function startSSE() {
+  function startSSE(autoSimulate?: "execute" | "skip") {
     if (esRef.current) esRef.current.close();
-    const es = new EventSource(`/api/pipeline/${params.id}/stream`);
+    const url = autoSimulate
+      ? `/api/pipeline/${params.id}/stream?autoSimulate=${autoSimulate}`
+      : `/api/pipeline/${params.id}/stream`;
+    const es = new EventSource(url);
     esRef.current = es;
     es.onmessage = (e) => handleEvent(JSON.parse(e.data) as PipelineSSEEvent);
     es.onerror   = () => {
@@ -172,16 +175,10 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
     setSteps(INITIAL_STEPS.map(s => ({ ...s })));
     setTotalMs(null);
     setTxHashes([]);
-    startSSE();
-    try {
-      await fetch("/api/pipeline/simulate", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ pipelineId: params.id, branch }),
-      });
-    } finally {
-      setTriggering(false);
-    }
+    // Pass autoSimulate to the stream URL so simulation runs in the same
+    // serverless function instance as the SSE listener (Vercel-safe).
+    startSSE(branch);
+    setTriggering(false);
   }
 
   async function handleTrigger() {
