@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const provider = new ethers.JsonRpcProvider(HTTP_RPC);
+    const provider = new ethers.JsonRpcProvider(HTTP_RPC, new ethers.Network("somnia-shannon", 50312), { staticNetwork: new ethers.Network("somnia-shannon", 50312) });
     const contract = new Contract(REGISTRY_ADDRESS, ABI, provider);
 
     const filter = contract.filters.StepCompleted(BigInt(params.id));

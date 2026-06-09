@@ -201,7 +201,12 @@ export async function startEventListener(): Promise<void> {
   });
 
   // SDK-relay: start relay coordinator alongside event listener (Branch B fallback)
-  await startRelayCoordinator();
+  // Wrapped in try/catch — relay failure must not crash the SSE stream route
+  try {
+    await startRelayCoordinator();
+  } catch (err) {
+    console.error("[PipelineService] relay coordinator failed to start:", err instanceof Error ? err.message : err);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
