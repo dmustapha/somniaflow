@@ -1,10 +1,10 @@
 // [VERIFIED] — Server Component — fetches real on-chain data from getPipelineState
 import Link from "next/link";
-import { getPipelineState, getTransactionHistory } from "@/lib/pipeline-service";
+import { getPipelineState, getTransactionHistory, getStepDefinitions } from "@/lib/pipeline-service";
 import { parsePipelineDecision } from "@/lib/parse-decision";
 import { SiteNav } from "@/components/SiteNav";
 
-const REGISTRY  = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "";
+const REGISTRY  = "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6";
 const EXPLORER  = "https://shannon-explorer.somnia.network";
 const CHAIN_ID  = 50312;
 
@@ -12,23 +12,14 @@ const DEMO_IDS  = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1,2")
   .split(",")
   .map(s => s.trim());
 
-function formatPrice(raw: string): string {
-  const n = parseInt(raw, 10);
-  if (isNaN(n)) return raw;
-  return `$${(n / 100).toFixed(2)} USD`;
-}
-
-function formatVolume(raw: string): string {
-  const n = parseInt(raw, 10);
-  if (isNaN(n)) return raw;
-  return `$${(n / 1_000_000).toFixed(1)}M 24h volume`;
-}
+const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse" };
 
 export default async function ProofPage() {
-  // Fetch pipeline states and TX history in parallel
-  const [stateResults, historyResults] = await Promise.all([
+  // Fetch pipeline states, step defs, and TX history in parallel
+  const [stateResults, historyResults, stepDefsResults] = await Promise.all([
     Promise.allSettled(DEMO_IDS.map(id => getPipelineState(id))),
     Promise.allSettled(DEMO_IDS.map(id => getTransactionHistory(id))),
+    Promise.allSettled(DEMO_IDS.map(id => getStepDefinitions(id))),
   ]);
 
   return (
@@ -68,17 +59,23 @@ export default async function ProofPage() {
 
         {/* Pipeline state sections — TX hashes lead */}
         {DEMO_IDS.map((id, idx) => {
-          const stateResult   = stateResults[idx];
-          const historyResult = historyResults[idx];
-          const state         = stateResult.status === "fulfilled" ? stateResult.value : null;
-          const history       = historyResult.status === "fulfilled" ? historyResult.value : [];
-
-          const step0Result  = state?.stepResults?.[0];
-          const step1Result  = state?.stepResults?.[1];
-          const step2Result  = state?.stepResults?.[2];
-          const decision     = step1Result ? parsePipelineDecision(step1Result) : null;
+          const stateResult    = stateResults[idx];
+          const historyResult  = historyResults[idx];
+          const stepDefsResult = stepDefsResults[idx];
+          const state          = stateResult.status === "fulfilled" ? stateResult.value : null;
+          const history        = historyResult.status === "fulfilled" ? historyResult.value : [];
+          const stepDefs       = stepDefsResult?.status === "fulfilled" ? stepDefsResult.value : [];
 
           const hasResults = state && (state.status === "Complete" || state.stepResults?.some(Boolean));
+
+          // Find LLM step for decision display
+          const llmStepIdx = stepDefs.findIndex(d => d.agentType === 1);
+          const llmResult  = llmStepIdx >= 0 ? state?.stepResults?.[llmStepIdx] : state?.stepResults?.[1];
+          const decision   = llmResult ? parsePipelineDecision(llmResult) : null;
+
+          const pipelineName = stepDefs.length > 0
+            ? stepDefs.map(d => AGENT_TYPE_NAMES[d.agentType]).join(" → ")
+            : `Pipeline #${id}`;
 
           return (
             <div key={id} style={{ marginBottom: "40px" }}>
@@ -92,7 +89,7 @@ export default async function ProofPage() {
                   color: "var(--text-hi)", fontFamily: "var(--font-sans)",
                   margin: 0,
                 }}>
-                  ETH Rebalancing Agent
+                  {pipelineName}
                 </h2>
                 <span style={{
                   fontSize: "10px", fontFamily: "var(--font-mono)",
@@ -135,29 +132,32 @@ export default async function ProofPage() {
                         </span>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                        {run.steps.map((step) => (
-                          <div key={step.txHash} style={{
-                            display: "flex", alignItems: "baseline", gap: "10px",
-                          }}>
-                            <span style={{
-                              fontSize: "10px", fontFamily: "var(--font-mono)",
-                              color: "var(--text-lo)", flexShrink: 0, minWidth: "44px",
+                        {run.steps.map((step) => {
+                          const cleanHash = step.txHash.trim();
+                          return (
+                            <div key={cleanHash} style={{
+                              display: "flex", alignItems: "baseline", gap: "10px",
                             }}>
-                              Step {step.step + 1}
-                            </span>
-                            <a
-                              href={step.explorerUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                fontSize: "11px", fontFamily: "var(--font-mono)",
-                                color: "var(--brand)", textDecoration: "none", opacity: 0.8,
-                              }}
-                            >
-                              {step.txHash.slice(0, 14)}…{step.txHash.slice(-6)} ↗
-                            </a>
-                          </div>
-                        ))}
+                              <span style={{
+                                fontSize: "10px", fontFamily: "var(--font-mono)",
+                                color: "var(--text-lo)", flexShrink: 0, minWidth: "44px",
+                              }}>
+                                Step {step.step + 1}
+                              </span>
+                              <a
+                                href={`${EXPLORER}/tx/${cleanHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: "11px", fontFamily: "var(--font-mono)",
+                                  color: "var(--brand)", textDecoration: "none", opacity: 0.8,
+                                }}
+                              >
+                                {cleanHash.slice(0, 14)}…{cleanHash.slice(-6)} ↗
+                              </a>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -168,14 +168,14 @@ export default async function ProofPage() {
                   fontSize: "13px", color: "var(--text-lo)",
                   fontFamily: "var(--font-sans)", lineHeight: 1.6,
                 }}>
-                  No runs recorded yet.{" "}
+                  No blockchain records yet.{" "}
                   <Link
                     href={`/pipeline/${id}?demo=execute`}
                     style={{ color: "var(--brand)", textDecoration: "none" }}
                   >
                     Run the demo →
                   </Link>
-                  {" "}to generate your first blockchain record here.
+                  {" "}to generate the first on-chain record.
                 </div>
               )}
 
@@ -189,52 +189,74 @@ export default async function ProofPage() {
                     LAST RUN RESULTS
                   </div>
 
-                  {step0Result && (
-                    <div className="sf-dr">
-                      <span className="sf-dr-key">Step 1 — ETH price</span>
-                      <span className="sf-dr-val hi">{formatPrice(step0Result)}</span>
-                    </div>
-                  )}
+                  {state.stepResults?.map((result, i) => {
+                    if (!result) return null;
+                    const def     = stepDefs[i];
+                    const isLlm   = def?.agentType === 1;
+                    const isSkip  = state.stepStatuses?.[i] === "skipped";
+                    const stepDecision = isLlm ? parsePipelineDecision(result) : null;
 
-                  {decision && (
-                    <div className="sf-dr">
-                      <span className="sf-dr-key">Step 2 — AI decision</span>
-                      <span className={`sf-dr-val ${decision.decision === "EXECUTE" ? "ok" : ""}`}>
-                        {decision.decision === "EXECUTE" ? "Rebalance" : "Wait"}
-                        {decision.swapPct > 0 && ` · ${decision.swapPct}% rebalance`}
-                      </span>
-                    </div>
-                  )}
+                    if (isSkip) return (
+                      <div key={i} className="sf-dr">
+                        <span className="sf-dr-key">Step {i + 1}</span>
+                        <span className="sf-dr-val" style={{ color: "var(--text-lo)" }}>SKIPPED</span>
+                      </div>
+                    );
 
-                  {step1Result && decision && (
-                    <div style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                      <span style={{ fontSize: "10px", color: "var(--text-lo)", fontFamily: "var(--font-sans)" }}>
-                        AI reasoning
-                      </span>
-                      <p style={{
-                        margin: "4px 0 0", fontSize: "12px", color: "var(--text-mid)",
-                        lineHeight: 1.55, fontFamily: "var(--font-sans)",
-                      }}>
-                        {decision.reasoning}
-                      </p>
-                    </div>
-                  )}
+                    if (stepDecision) return (
+                      <div key={i}>
+                        <div className="sf-dr">
+                          <span className="sf-dr-key">Step {i + 1} — AI decision</span>
+                          <span className={`sf-dr-val ${stepDecision.decision === "EXECUTE" ? "ok" : ""}`}>
+                            {stepDecision.decision}
+                            {stepDecision.swapPct > 0 && ` · ${stepDecision.swapPct}%`}
+                          </span>
+                        </div>
+                        {stepDecision.reasoning && (
+                          <div style={{ padding: "6px 0 8px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                            <p style={{
+                              margin: 0, fontSize: "11px", color: "var(--text-mid)",
+                              lineHeight: 1.55, fontFamily: "var(--font-sans)",
+                            }}>
+                              {stepDecision.reasoning}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
 
-                  {step2Result ? (
-                    <div className="sf-dr">
-                      <span className="sf-dr-key">Step 3 — 24h volume</span>
-                      <span className="sf-dr-val hi">{formatVolume(step2Result)}</span>
-                    </div>
-                  ) : (
-                    state?.stepStatuses?.[2] === "skipped" && (
-                      <div className="sf-dr">
-                        <span className="sf-dr-key">Step 3</span>
-                        <span className="sf-dr-val" style={{ color: "var(--text-lo)" }}>
-                          SKIPPED — smart contract blocked this step
+                    return (
+                      <div key={i} className="sf-dr">
+                        <span className="sf-dr-key">
+                          Step {i + 1}{def ? ` — ${AGENT_TYPE_NAMES[def.agentType]}` : ""}
+                        </span>
+                        <span className="sf-dr-val hi" style={{ maxWidth: "280px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {result.length > 60 ? `${result.slice(0, 60)}…` : result}
                         </span>
                       </div>
-                    )
-                  )}
+                    );
+                  })}
+
+                  {/* Show skipped steps that have no result */}
+                  {state.stepStatuses?.map((status, i) => {
+                    if (status !== "skipped" || state.stepResults?.[i]) return null;
+                    return (
+                      <div key={`skip-${i}`} className="sf-dr">
+                        <span className="sf-dr-key">Step {i + 1}</span>
+                        <span className="sf-dr-val" style={{ color: "var(--text-lo)" }}>SKIPPED</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {!hasResults && state && (
+                <div className="sf-glass" style={{
+                  padding: "14px 18px",
+                  fontSize: "12px", color: "var(--text-lo)",
+                  fontFamily: "var(--font-sans)",
+                }}>
+                  Pipeline status: {state.status} · STT balance: {state.sttBalance}
                 </div>
               )}
             </div>

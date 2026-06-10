@@ -7,14 +7,21 @@ interface SiteNavProps {
 }
 
 const NAV_LINKS = [
-  { href: "/",           label: "Home"         },
-  { href: "/pipeline/1", label: "Live Demo"    },
-  { href: "/proof",      label: "Verify Proof" },
+  { href: "/",           label: "Home"      },
+  { href: "/pipeline/1", label: "Live Demo" },
+  { href: "/compose",    label: "Compose"   },
+  { href: "/proof",      label: "Proof"     },
 ];
+
+function isComposePath(href: string, pathname: string) {
+  if (href === "/compose") return pathname.startsWith("/compose");
+  return false;
+}
 
 function isActive(href: string, pathname: string) {
   if (href === "/") return pathname === "/";
   if (href.startsWith("/pipeline")) return pathname.startsWith("/pipeline");
+  if (isComposePath(href, pathname)) return true;
   return pathname === href || pathname.startsWith(href + "/");
 }
 

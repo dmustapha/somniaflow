@@ -4,7 +4,7 @@ import { ethers, Contract, Wallet, parseEther, formatEther } from "ethers";
 import { pipelineBus } from "./event-bus";
 import { parsePipelineDecision } from "./parse-decision";
 import { startRelayCoordinator } from "./relay-coordinator";
-import type { PipelineStepInput, PipelineStateView, PipelineSSEEvent } from "@/types";
+import type { PipelineStepInput, PipelineStepDef, PipelineStateView, PipelineSSEEvent } from "@/types";
 
 // [VERIFIED] — Shannon testnet HTTP RPC (WebSocket unstable; polling via JsonRpcProvider)
 const HTTP_RPC = "https://dream-rpc.somnia.network";
@@ -20,6 +20,7 @@ const REGISTRY_ABI = [
   "function fundPipeline(uint256 pipelineId) payable",
   "function triggerPipeline(uint256 pipelineId)",
   "function getPipelineState(uint256 pipelineId) view returns (tuple(uint256,uint8,uint256,uint8[],uint256,string[]))",
+  "function getPipelineSteps(uint256 pipelineId) view returns (tuple(uint8 agentType, string inputTemplate, bool conditionalOnPrev, uint8 maxRetries)[])",
   "function getPipelineStepResult(uint256 pipelineId, uint256 stepIndex) view returns (string,uint8)",
   "function withdrawBalance(uint256 pipelineId)",
   "event PipelineRegistered(uint256 indexed pipelineId, address indexed owner, uint256 stepCount)",
@@ -94,12 +95,17 @@ export async function startEventListener(): Promise<void> {
   const provider   = getHttpProvider();
   _pollContract    = new Contract(REGISTRY_ADDRESS, REGISTRY_ABI, provider);
 
-  _pollContract.on("PipelineStarted", (pipelineId: bigint) => {
+  _pollContract.on("PipelineStarted", async (pipelineId: bigint) => {
     const id = pipelineId.toString();
     _runStartTimes.set(id, Date.now());
+    let stepCount = 3; // fallback
+    try {
+      const steps = await _pollContract!.getPipelineSteps(pipelineId);
+      stepCount = steps.length;
+    } catch { /* use fallback */ }
     pipelineBus.emit(id, {
       type: "pipeline_started",
-      data: { pipelineId: id, stepCount: 3 },
+      data: { pipelineId: id, stepCount },
     });
   });
 
@@ -266,6 +272,18 @@ export async function getPipelineState(pipelineId: string): Promise<PipelineStat
     sttBalance:   formatEther(raw[4]),
     stepResults: Array.from(raw[5] as ArrayLike<unknown>).map(s => String(s)),
   };
+}
+
+export async function getStepDefinitions(pipelineId: string): Promise<PipelineStepDef[]> {
+  const contract = new Contract(REGISTRY_ADDRESS, REGISTRY_ABI, getHttpProvider());
+  const steps    = await contract.getPipelineSteps(BigInt(pipelineId));
+  return Array.from(steps as ArrayLike<{ agentType: bigint | number; inputTemplate: string; conditionalOnPrev: boolean; maxRetries: bigint | number }>).map((s, i) => ({
+    index:            i,
+    agentType:        Number(s.agentType) as 0 | 1 | 2,
+    inputTemplate:    s.inputTemplate,
+    conditionalOnPrev: s.conditionalOnPrev,
+    maxRetries:       Number(s.maxRetries),
+  }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

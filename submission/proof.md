@@ -9,7 +9,7 @@
 
 | Contract | Address | Explorer |
 |----------|---------|---------|
-| PipelineRegistry.sol | `0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6` | [View on Shannon Explorer](https://shannon-explorer.somnia.network/address/0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6) |
+| PipelineRegistry.sol | `0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc` | [View on Shannon Explorer](https://shannon-explorer.somnia.network/address/0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc) |
 | ChainTest.sol (gate validation) | `0x566f178Aa88BfC251C3e8be0A5cAB003D7692dfd` | [View on Shannon Explorer](https://shannon-explorer.somnia.network/address/0x566f178Aa88BfC251C3e8be0A5cAB003D7692dfd) |
 
 ---
@@ -19,7 +19,7 @@
 | Contract | TX Hash | Gas Used |
 |----------|---------|---------|
 | ChainTest.sol deploy | `0x22bf6fe9649519f4f4d5ade9051a890043645ec30e6d326cc4698ceee43831dd` | ~21M |
-| PipelineRegistry.sol deploy | `0x0272188de761ac6666e7f26b7089ec00952ea1ffdc3b0af7817a68182a91e38b` | 69,860,517 |
+| PipelineRegistry.sol deploy | `0x0ebd2be7b1a42d772fba77763198c051b7087cc8b13bdf4771cc59062c9a456a` | 80,606,656 |
 
 ---
 
@@ -27,8 +27,8 @@
 
 | Pipeline | TX Hash | Steps |
 |----------|---------|-------|
-| Pipeline 1 | `0xf6d44...` (see env) | 3 steps: JSON API → LLM → Conditional JSON API |
-| Pipeline 3 | `0x7f86c68da0d7e24ee41b62788c10c04fa3f52a2643f2e640b530ace0e959c824` | 3 steps: JSON API → LLM → Conditional JSON API |
+| Pipeline 1 | `0xc6136453f1c193dc3d585392796a830d1e8239fbbe8f2a3c1c542fce1aec36d6` | 3 steps: JSON API → LLM → Conditional JSON API |
+| Pipeline 2 | registered on-chain, funded 0.13 STT | 3 steps: JSON API → LLM → Conditional JSON API |
 
 ---
 

@@ -10,7 +10,7 @@ export type PipelineSSEEvent =
   | { type: "step_skipped";      data: { step: number } }
   | { type: "step_retrying";     data: { step: number; attempt: number } }
   | { type: "decision";          data: PipelineDecision }
-  | { type: "pipeline_complete"; data: { pipelineId: string; totalMs: number; txHashes: string[] } }
+  | { type: "pipeline_complete"; data: { pipelineId: string; totalMs: number; txHashes: string[]; simulated?: boolean } }
   | { type: "pipeline_failed";   data: { step: number; reason: string } }
   | { type: "error";             data: string };
 
@@ -25,6 +25,14 @@ export type PipelineStepStatus =
   | "idle" | "pending" | "complete" | "failed" | "retrying" | "skipped";
 
 export interface PipelineStepInput {
+  agentType:        0 | 1 | 2;
+  inputTemplate:    string;
+  conditionalOnPrev: boolean;
+  maxRetries:       number;
+}
+
+export interface PipelineStepDef {
+  index:            number;
   agentType:        0 | 1 | 2;
   inputTemplate:    string;
   conditionalOnPrev: boolean;

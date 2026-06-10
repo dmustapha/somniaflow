@@ -99,15 +99,14 @@ contract PipelineRegistry {
     bytes private constant EXECUTE_NEEDLE = bytes("DECISION: EXECUTE");
 
     string private constant SYSTEM_PROMPT =
-        "You are an autonomous trading decision agent. Given position data, respond with EXACTLY:\n"
+        "You are a data processing agent. Analyze the input and respond with EXACTLY:\n"
         "DECISION: EXECUTE\n"
         "or\n"
         "DECISION: SKIP\n"
         "Then on separate lines:\n"
-        "REASONING: [2-3 sentences referencing specific numbers]\n"
-        "SWAP_AMOUNT_PCT: [integer 0-100]\n"
+        "REASONING: [2-3 sentences explaining your analysis]\n"
         "CONFIDENCE: [HIGH|MEDIUM|LOW]\n"
-        "No other text before or after. DECISION must appear on the first line.";
+        "DECISION must appear on the first line.";
 
     // -------------------------------------------------------------------------
     // Storage types
@@ -303,6 +302,48 @@ contract PipelineRegistry {
         _advancePipeline(pipelineId, pipe.activePipelineStep);
     }
 
+    /**
+     * @notice Relay-injected step result. Bypasses Shannon Platform callback.
+     *         Called by _relayAddress after executing the agent step off-chain.
+     *         Injects the result directly and advances the pipeline FSM.
+     * @param requestId  The requestId emitted in the StepDispatched event
+     * @param result     String result from the agent execution (price, LLM output, etc.)
+     */
+    function ownerHandleResponse(uint256 requestId, string calldata result) external {
+        require(msg.sender == _relayAddress, "PipelineRegistry: not relay");
+
+        uint256 pipelineId = _requestToPipeline[requestId];
+        require(pipelineId != 0, "PipelineRegistry: unknown requestId");
+
+        Pipeline storage pipe = _pipelines[pipelineId];
+        require(pipe.pendingRequestId == requestId, "PipelineRegistry: stale requestId");
+        require(pipe.active, "PipelineRegistry: not active");
+
+        uint256 step = pipe.activePipelineStep;
+
+        pipe.stepResults[step]  = result;
+        pipe.stepStatuses[step] = StepStatus.Complete;
+        pipe.pendingRequestId   = 0;
+
+        emit StepCompleted(pipelineId, step, result);
+
+        // Advance pipeline — next _dispatchStep will emit StepDispatched for relay to pick up
+        _advancePipeline(pipelineId, step);
+    }
+
+    /**
+     * @notice Emergency reset for a stuck pipeline (status=Running but no pending callback).
+     *         Only callable by _relayAddress. Resets FSM to Idle so pipeline can be re-triggered.
+     */
+    function emergencyReset(uint256 pipelineId) external {
+        require(msg.sender == _relayAddress, "PipelineRegistry: not relay");
+        Pipeline storage pipe = _pipelines[pipelineId];
+        require(pipe.status == PipelineStatus.Running, "PipelineRegistry: not running");
+        pipe.active           = false;
+        pipe.status           = PipelineStatus.Idle;
+        pipe.pendingRequestId = 0;
+    }
+
     // -------------------------------------------------------------------------
     // External — reads
     // -------------------------------------------------------------------------
@@ -331,6 +372,30 @@ contract PipelineRegistry {
         Pipeline storage pipe = _pipelines[pipelineId];
         require(stepIndex < pipe.steps.length, "PipelineRegistry: out of range");
         return (pipe.stepResults[stepIndex], pipe.stepStatuses[stepIndex]);
+    }
+
+    /**
+     * @notice Returns the step definitions for a pipeline.
+     *         Used by the relay coordinator to get inputTemplate for each step.
+     */
+    function getPipelineSteps(uint256 pipelineId)
+        external
+        view
+        returns (PipelineStep[] memory)
+    {
+        return _pipelines[pipelineId].steps;
+    }
+
+    /**
+     * @notice Returns pipeline name and step count for UI display.
+     */
+    function getPipelineMeta(uint256 pipelineId)
+        external
+        view
+        returns (address owner, uint256 stepCount, bool active, PipelineStatus status)
+    {
+        Pipeline storage pipe = _pipelines[pipelineId];
+        return (pipe.owner, pipe.steps.length, pipe.active, pipe.status);
     }
 
     function withdrawBalance(uint256 pipelineId) external {
@@ -455,7 +520,12 @@ contract PipelineRegistry {
     }
 
     function _calcDeposit(uint8 agentType) internal view returns (uint256) {
-        uint256 reserveFloor = PLATFORM.getRequestDeposit();
+        uint256 reserveFloor;
+        try PLATFORM.getRequestDeposit() returns (uint256 floor) {
+            reserveFloor = floor;
+        } catch {
+            reserveFloor = 0.01 ether; // 0.01 STT fallback if Platform reverts
+        }
         uint256 pricePerAgent;
         if (agentType == AGENT_TYPE_LLM)            pricePerAgent = LLM_PRICE_PER_AGENT;
         else if (agentType == AGENT_TYPE_PARSE_WEB) pricePerAgent = LLM_PARSE_PRICE_PER_AGENT;

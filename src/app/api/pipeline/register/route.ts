@@ -1,9 +1,13 @@
 // [VERIFIED] — Next.js 14 App Router route handler pattern
 import { NextRequest, NextResponse } from "next/server";
 import { registerPipeline } from "@/lib/pipeline-service";
+import { checkApiKey } from "@/lib/auth";
 import type { PipelineStepInput } from "@/types";
 
 export async function POST(req: NextRequest) {
+  if (!checkApiKey(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   let steps: PipelineStepInput[];
   try {
     const body = await req.json();

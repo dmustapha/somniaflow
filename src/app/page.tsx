@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { getPipelineState } from "@/lib/pipeline-service";
+import { getPipelineState, getStepDefinitions } from "@/lib/pipeline-service";
 import { LiveBlock } from "@/components/LiveBlock";
 import { SiteNav } from "@/components/SiteNav";
 
@@ -8,10 +8,10 @@ const DEMO_PIPELINE_IDS = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1,2")
   .split(",")
   .map(s => s.trim());
 
-const REGISTRY_ADDR  = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "";
-const REGISTRY_SHORT = REGISTRY_ADDR
-  ? `0x${REGISTRY_ADDR.slice(2, 6)}\u2026${REGISTRY_ADDR.slice(-4)}`
-  : "0xF1d4\u2026Cbd6";
+const REGISTRY_ADDR  = "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6";
+const REGISTRY_SHORT = `0x${REGISTRY_ADDR.slice(2, 6)}\u2026${REGISTRY_ADDR.slice(-4)}`;
+
+const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse" };
 
 const STATUS_COLOR: Record<string, string> = {
   Idle:     "var(--text-lo)",
@@ -20,25 +20,15 @@ const STATUS_COLOR: Record<string, string> = {
   Failed:   "#f87171",
 };
 
-const PIPELINE_META: Record<string, { name: string; description: string }> = {
-  "1": {
-    name:        "ETH Rebalancing Agent",
-    description: "Check price · AI decides · Check volume",
-  },
-  "2": {
-    name:        "ETH Rebalancing Agent v2",
-    description: "Check price · AI decides · Check volume",
-  },
-};
-
 async function PipelineList() {
-  const states = await Promise.allSettled(
-    DEMO_PIPELINE_IDS.map(id => getPipelineState(id))
-  );
+  const [stateResults, stepResults] = await Promise.all([
+    Promise.allSettled(DEMO_PIPELINE_IDS.map(id => getPipelineState(id))),
+    Promise.allSettled(DEMO_PIPELINE_IDS.map(id => getStepDefinitions(id))),
+  ]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-      {states.map((result, i) => {
+      {stateResults.map((result, i) => {
         const id = DEMO_PIPELINE_IDS[i];
         if (result.status === "rejected") {
           return (
@@ -51,9 +41,15 @@ async function PipelineList() {
             </div>
           );
         }
-        const state    = result.value;
-        const pipeMeta = PIPELINE_META[id] ?? { name: `Demo ${id}`, description: "3 steps" };
-        const dotColor = STATUS_COLOR[state.status] ?? "var(--text-lo)";
+        const state     = result.value;
+        const stepDefs  = stepResults[i]?.status === "fulfilled" ? stepResults[i].value : [];
+        const pipeName  = stepDefs.length > 0
+          ? stepDefs.map(d => AGENT_TYPE_NAMES[d.agentType]).join(" → ")
+          : `Pipeline #${id}`;
+        const pipeDesc  = stepDefs.length > 0
+          ? `${stepDefs.length} agents · on-chain orchestration`
+          : "3 agents";
+        const dotColor  = STATUS_COLOR[state.status] ?? "var(--text-lo)";
         const isRunning = state.status === "Running";
 
         return (
@@ -76,10 +72,10 @@ async function PipelineList() {
               />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-hi)", marginBottom: "3px" }}>
-                  {pipeMeta.name}
+                  {pipeName}
                 </div>
                 <div style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-lo)" }}>
-                  {pipeMeta.description}
+                  {pipeDesc}
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -135,7 +131,7 @@ export default function HomePage() {
             display: "flex", alignItems: "center", gap: "16px",
           }}>
             <span style={{ width: "40px", height: "1px", background: "linear-gradient(90deg, transparent, var(--brand))", flexShrink: 0 }} />
-            Demo: AI making financial decisions on-chain
+            On-chain multi-agent orchestration
             <span style={{ width: "40px", height: "1px", background: "linear-gradient(90deg, var(--brand), transparent)", flexShrink: 0 }} />
           </div>
 
@@ -149,11 +145,9 @@ export default function HomePage() {
             color: "var(--text-hi)",
             marginBottom: "22px",
           }}>
-            An AI agent that reads<br />
-            ETH prices, decides whether<br />
-            to rebalance, and{" "}
-            <em style={{ color: "var(--brand)" }}>records every<br />
-            decision permanently.</em>
+            Chain AI agents together and{" "}
+            <em style={{ color: "var(--brand)" }}>record every<br />
+            decision permanently on-chain.</em>
           </h1>
 
           <p style={{
@@ -161,10 +155,10 @@ export default function HomePage() {
             maxWidth: "560px", marginBottom: "36px",
             fontFamily: "var(--font-sans)",
           }}>
-            SomniaFlow runs three AI agents in sequence: one checks the ETH price,
-            one decides whether to rebalance your portfolio, and one acts on that
-            decision — all coordinated by a smart contract with no human in the loop.
-            The logic is transparent and tamper-proof — anyone can audit it.
+            SomniaFlow runs sequences of AI agents coordinated by a smart contract.
+            Each step can fetch data, run LLM inference, or parse the web.
+            The contract decides which steps execute based on each agent&apos;s output.
+            No server, no human in the loop — the logic is transparent and anyone can audit it.
           </p>
 
           {/* Plain-English stat strip */}
@@ -177,8 +171,8 @@ export default function HomePage() {
             {[
               { val: "LIVE",     label: "On Somnia blockchain",    color: "var(--ok)"      },
               { val: "ON-CHAIN", label: "Decisions stored forever", color: "var(--ok)"      },
-              { val: "NONE",     label: "No central server",        color: "var(--text-hi)" },
-              { val: "$0",       label: "Free to run",              color: "var(--text-hi)" },
+              { val: "OPEN",     label: "Anyone can verify",        color: "var(--text-hi)" },
+              { val: "FAST",     label: "~1s block times",          color: "var(--text-hi)" },
             ].map((s, i) => (
               <div key={i} style={{
                 padding: "12px 14px",
@@ -201,12 +195,24 @@ export default function HomePage() {
           </div>
 
           {/* Demo CTAs */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "48px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=execute`}>
-              <button className="sf-btn-primary">Run demo: AI decides to rebalance</button>
+              <button className="sf-btn-primary">Run demo: AI executes all steps</button>
             </Link>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=skip`}>
-              <button className="sf-btn-ghost">Run demo: AI decides to wait</button>
+              <button className="sf-btn-ghost">Run demo: AI skips a step</button>
+            </Link>
+          </div>
+          <div style={{ marginBottom: "48px" }}>
+            <Link
+              href="/compose"
+              style={{
+                fontSize: "13px", fontFamily: "var(--font-sans)",
+                color: "var(--text-mid)", textDecoration: "none",
+                letterSpacing: "0.02em",
+              }}
+            >
+              or build your own pipeline →
             </Link>
           </div>
 
@@ -286,11 +292,11 @@ export default function HomePage() {
               </div>
 
               {[
-                { k: "Smart contract decides", v: "Reads the AI's output and chooses which steps run next",   cls: ""      },
-                { k: "Decision source",        v: "Smart contract — not a server, not an API",               cls: "ok"    },
-                { k: "AI rebalances",          v: "All 3 steps run and are recorded on-chain",               cls: ""      },
-                { k: "AI waits",               v: "Only 2 steps run — contract blocks the third",            cls: ""      },
-                { k: "Contract address",       v: REGISTRY_SHORT || "0xF1d4\u2026Cbd6",                     cls: "brand" },
+                { k: "Smart contract decides", v: "Reads each agent's output and decides which step runs next", cls: ""      },
+                { k: "Decision source",        v: "Smart contract — not a server, not an API",                 cls: "ok"    },
+                { k: "All steps run",          v: "Every agent executes and is recorded on-chain",             cls: ""      },
+                { k: "Step skipped",           v: "Contract blocks the step — still recorded on-chain",        cls: ""      },
+                { k: "Contract address",       v: REGISTRY_SHORT,                                              cls: "brand" },
               ].map(({ k, v, cls }) => (
                 <div key={k} className="sf-dr">
                   <span className="sf-dr-key">{k}</span>
@@ -309,7 +315,7 @@ export default function HomePage() {
                     opacity: 0.7, transition: "opacity 0.15s",
                   }}
                 >
-                  ↗ view contract on blockchain explorer
+                  ↗ view contract on explorer
                 </a>
                 <Link
                   href="/proof"

@@ -11,7 +11,7 @@ The first on-chain multi-agent orchestration protocol on Somnia. Register a pipe
 ![SomniaFlow home page](docs/images/landing.png)
 
 **Live demo:** [somniaflow.vercel.app](https://somniaflow.vercel.app)
-**Contract:** [`0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6`](https://shannon-explorer.somnia.network/address/0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6) on Shannon testnet
+**Contract:** [`0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc`](https://shannon-explorer.somnia.network/address/0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc) on Shannon testnet
 
 ---
 
@@ -22,9 +22,9 @@ Today, every multi-agent workflow on Somnia requires an off-chain coordinator. T
 The core is `PipelineRegistry.sol` — an on-chain FSM that stores pipeline definitions (ordered steps, agent assignments, balances) and emits `StepCompleted` events as each agent finishes. An off-chain relay coordinator listens to these events and dispatches the next step, giving you verifiable multi-agent coordination with every handoff recorded on-chain.
 
 **Demo pipeline:**
-1. **Portfolio Watcher** — monitors a wallet's token balances
-2. **Risk Analyst** — evaluates the portfolio and decides: rebalance (execute) or hold (skip)
-3. **DeFi Executor** — conditionally executes the swap, skipped if Risk Analyst says hold
+1. **Data Fetcher** — fetches live data from a JSON API
+2. **AI Analyst** — evaluates the data and decides: execute or skip the next step
+3. **Conditional Actor** — runs only if the AI Analyst says execute; skipped otherwise
 
 Every decision, step result, and branch path is stored as a transaction on Shannon testnet.
 
@@ -34,8 +34,9 @@ Every decision, step result, and branch path is stored as a transaction on Shann
 
 - **On-chain pipeline FSM**: `PipelineRegistry.sol` stores ordered steps, agent assignments, and balances; the contract is the source of truth
 - **Conditional branching**: agents can mark steps as Skip, advancing past dependent steps without an off-chain controller deciding
+- **Pipeline Composer**: build custom pipelines from the UI — choose agents, set conditional logic, deploy and fund on-chain from `/compose`
 - **Live SSE stream**: the frontend streams step events in real time via Server-Sent Events, no WebSocket dependency
-- **Simulate endpoint**: demo pipelines run without STT via `/api/pipeline/simulate`, enabling judging without testnet funds
+- **Demo mode**: pipelines run in-browser without STT via the simulate path, enabling review without testnet funds
 - **Proof page**: live contract state and transaction hashes, queryable on Shannon Explorer
 - **47 forge tests**: full coverage of registration, dispatch, fund management, and access control
 
@@ -49,7 +50,7 @@ Every decision, step result, and branch path is stored as a transaction on Shann
 
 Or query directly:
 ```bash
-cast call 0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6 \
+cast call 0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc \
   "getPipeline(uint256)(address,bool,uint8,uint256)" 1 \
   --rpc-url https://dream-rpc.somnia.network
 ```
@@ -118,8 +119,10 @@ Fill in `.env.local`:
 ```env
 DEPLOYER_PRIVATE_KEY=0x_your_private_key_here
 DEPLOYER_ADDRESS=0x_your_address_here
-NEXT_PUBLIC_REGISTRY_ADDRESS=0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6
+NEXT_PUBLIC_REGISTRY_ADDRESS=0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc
 NEXT_PUBLIC_DEMO_PIPELINE_IDS=2,3
+ANTHROPIC_API_KEY=sk-ant-your_key_here          # Required for AI Inference steps
+API_KEY=                                         # Optional: set to lock mutating routes
 ```
 
 ### 3. Run the frontend
@@ -174,7 +177,7 @@ function dispatchNext(uint256 pipelineId) external;
 
 | Network | Address | Explorer |
 |---|---|---|
-| Shannon testnet | `0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6` | [View](https://shannon-explorer.somnia.network/address/0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6) |
+| Shannon testnet | `0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc` | [View](https://shannon-explorer.somnia.network/address/0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc) |
 
 **Shannon testnet:** Chain ID 50312 | RPC `https://dream-rpc.somnia.network` | Explorer `shannon-explorer.somnia.network`
 
@@ -191,8 +194,9 @@ somniaflow/
 │   └── app/
 │       ├── page.tsx            # Home — pipeline cards + stat strip
 │       ├── pipeline/[id]/      # Pipeline detail + SSE stream UI
+│       ├── compose/            # Pipeline Composer — build custom pipelines on-chain
 │       ├── proof/              # Live on-chain proof page
-│       └── api/pipeline/       # Backend routes (simulate, register, fund, trigger, state, stream)
+│       └── api/pipeline/       # Backend routes (register, fund, trigger, state, stream, reset)
 ├── scripts/
 │   └── seed-demo.ts            # Seeds funded demo pipelines on Shannon
 ├── test/                       # Forge test suite (47 tests)

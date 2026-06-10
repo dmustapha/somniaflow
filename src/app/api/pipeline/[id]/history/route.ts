@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers, Contract } from "ethers";
 
-const HTTP_RPC          = "https://dream-rpc.somnia.network";
-const REGISTRY_ADDRESS  = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS!;
-const EXPLORER          = "https://shannon-explorer.somnia.network";
+export const dynamic = "force-dynamic";
+
+const HTTP_RPC         = "https://dream-rpc.somnia.network";
+const REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6").trim();
+const EXPLORER         = "https://shannon-explorer.somnia.network";
 
 const ABI = [
   "event StepCompleted(uint256 indexed pipelineId, uint256 step, string result)",

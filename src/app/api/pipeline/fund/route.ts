@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fundPipeline } from "@/lib/pipeline-service";
+import { checkApiKey } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
+  if (!checkApiKey(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   let pipelineId: string;
   let amountEther: string;
   try {

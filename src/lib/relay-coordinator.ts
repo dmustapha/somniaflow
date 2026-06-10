@@ -1,93 +1,164 @@
 // relay-coordinator.ts
-// SDK-relay pattern (Branch B): listens to StepCompleted events on PipelineRegistry
-// and calls dispatchNext(pipelineId) to advance the FSM off-chain.
-// Activated at Day 1 Gate Fail — handleResponse() does not re-dispatch internally.
-// Started alongside startEventListener() from the SSE stream route.
+// Watches StepDispatched events on PipelineRegistry and executes real agent steps.
+// Calls ownerHandleResponse() to inject results back into the contract.
+// This replaces the broken Shannon Platform callback path.
+//
+// Flow per step:
+//   triggerPipeline → _dispatchStep → PLATFORM.createRequest → StepDispatched
+//   Relay hears StepDispatched → executes agent (JSON API / Claude) → ownerHandleResponse
+//   ownerHandleResponse → StepCompleted + _advancePipeline → next StepDispatched
+//   Repeat until PipelineComplete
 
 import { ethers, Contract, Wallet } from "ethers";
+import {
+  AGENT_TYPE_JSON_API,
+  AGENT_TYPE_LLM,
+  AGENT_TYPE_PARSE_WEB,
+  executeJsonApi,
+  executeLlmInference,
+  executeLlmParseWebsite,
+} from "./relay-executor";
 
 const RELAY_ABI = [
-  "event StepCompleted(uint256 indexed pipelineId, uint256 step, string result)",
+  "event StepDispatched(uint256 indexed pipelineId, uint256 step, uint8 agentType, uint256 requestId)",
   "event PipelineComplete(uint256 indexed pipelineId)",
   "event PipelineFailed(uint256 indexed pipelineId, uint256 step, string reason)",
-  "function dispatchNext(uint256 pipelineId) external",
-  "function getPipelineState(uint256 pipelineId) view returns (tuple(uint256,uint8,uint256,uint8[],uint256,string[]))",
+  "function ownerHandleResponse(uint256 requestId, string calldata result) external",
+  "function getPipelineState(uint256 pipelineId) external view returns (tuple(uint256 pipelineId, uint8 status, uint256 activeStep, uint8[] stepStatuses, uint256 sttBalance, string[] stepResults))",
+  "function getPipelineSteps(uint256 pipelineId) external view returns (tuple(uint8 agentType, string inputTemplate, bool conditionalOnPrev, uint8 maxRetries)[])",
 ];
 
-const HTTP_RPC        = "https://dream-rpc.somnia.network";
-const REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS!;
-
-// Pipeline status enum matching PipelineRegistry.sol
-const STATUS_RUNNING = 1;
+const HTTP_RPC         = process.env.NEXT_PUBLIC_RPC_URL ?? "https://dream-rpc.somnia.network";
+const REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6").trim();
+const SHANNON_NETWORK  = new ethers.Network("somnia-shannon", 50312);
 
 let _relayStarted = false;
 
-function getSigner(): Wallet {
-  const key = process.env.DEPLOYER_PRIVATE_KEY;
-  if (!key) throw new Error("[Relay] DEPLOYER_PRIVATE_KEY not set");
-  const provider = new ethers.JsonRpcProvider(HTTP_RPC, new ethers.Network("somnia-shannon", 50312), { staticNetwork: new ethers.Network("somnia-shannon", 50312) });
-  return new Wallet(key, provider);
+export function isRelayStarted(): boolean {
+  return _relayStarted;
 }
 
 export async function startRelayCoordinator(): Promise<void> {
   if (_relayStarted) return;
-  _relayStarted = true;
 
+  const privateKey  = process.env.DEPLOYER_PRIVATE_KEY;
+  const claudeApiKey  = process.env.ANTHROPIC_API_KEY ?? "";
+
+  if (!privateKey) {
+    console.warn("[Relay] DEPLOYER_PRIVATE_KEY not set — relay disabled");
+    return;
+  }
+  if (!claudeApiKey) {
+    console.warn("[Relay] ANTHROPIC_API_KEY not set — LLM steps will fail");
+  }
   if (!REGISTRY_ADDRESS) {
-    console.error("[Relay] NEXT_PUBLIC_REGISTRY_ADDRESS not set — relay coordinator disabled");
+    console.warn("[Relay] NEXT_PUBLIC_REGISTRY_ADDRESS not set — relay disabled");
     return;
   }
 
-  // HTTP polling provider — WebSocketProvider fails network detection on Shannon
-  const provider       = new ethers.JsonRpcProvider(HTTP_RPC, new ethers.Network("somnia-shannon", 50312), { staticNetwork: new ethers.Network("somnia-shannon", 50312) });
-  const pollContract   = new Contract(REGISTRY_ADDRESS, RELAY_ABI, provider);
-  const signer         = getSigner();
-  const signerContract = new Contract(REGISTRY_ADDRESS, RELAY_ABI, signer);
+  _relayStarted = true;
 
-  console.log("[Relay] coordinator started (HTTP polling) — watching PipelineRegistry at", REGISTRY_ADDRESS);
+  const provider = new ethers.JsonRpcProvider(HTTP_RPC, SHANNON_NETWORK, {
+    staticNetwork: SHANNON_NETWORK,
+  });
+  const signer   = new Wallet(privateKey, provider);
+  const contract = new Contract(REGISTRY_ADDRESS, RELAY_ABI, signer);
 
-  pollContract.on("StepCompleted", async (pipelineId: bigint, step: bigint, result: string) => {
-    const id = pipelineId.toString();
-    console.log(`[Relay] StepCompleted — pipeline=${id} step=${step} result_len=${result.length}`);
+  console.log(`[Relay] started — registry=${REGISTRY_ADDRESS} wallet=${signer.address}`);
 
-    try {
-      // Read state to confirm pipeline is still Running and on the expected step
-      const state = await signerContract.getPipelineState(pipelineId);
-      // state tuple: (pipelineId, status, activePipelineStep, stepTypes, balance, results)
-      const status     = Number(state[1]);
-      const activeStep = Number(state[2]);
+  contract.on(
+    "StepDispatched",
+    async (pipelineId: bigint, step: bigint, agentType: number, requestId: bigint) => {
+      const pid    = pipelineId.toString();
+      const stepN  = Number(step);
+      const typeN  = Number(agentType);
+      const reqId  = requestId.toString();
 
-      if (status !== STATUS_RUNNING) {
-        console.log(`[Relay] pipeline=${id} status=${status} (not Running) — skipping dispatchNext`);
-        return;
+      console.log(`[Relay] StepDispatched pid=${pid} step=${stepN} type=${typeN} reqId=${reqId}`);
+
+      try {
+        // Read pipeline state to get the step's inputTemplate and prevResult
+        const state      = await contract.getPipelineState(pipelineId);
+        const results: string[]  = state.stepResults ?? state[5] ?? [];
+        const prevResult = stepN > 0 ? (results[stepN - 1] ?? "") : "";
+
+        // Re-read step definitions from the full pipeline state
+        // Note: getPipelineState only returns PipelineStateView — no step definitions.
+        // We need inputTemplate from on-chain. Use a separate query or embed in StepDispatched.
+        // For now, read from our in-memory registry if available, else use a fallback query.
+        // The relay-executor handles the execution once we have inputTemplate.
+        const inputTemplate = await getStepInputTemplate(contract, pipelineId, step);
+
+        // Execute the agent step
+        let result: string;
+
+        switch (typeN) {
+          case AGENT_TYPE_JSON_API:
+            result = await executeJsonApi(inputTemplate, prevResult);
+            break;
+          case AGENT_TYPE_LLM:
+            result = await executeLlmInference(inputTemplate, prevResult, claudeApiKey);
+            break;
+          case AGENT_TYPE_PARSE_WEB:
+            result = await executeLlmParseWebsite(inputTemplate, prevResult, claudeApiKey);
+            break;
+          default:
+            throw new Error(`Unknown agentType: ${typeN}`);
+        }
+
+        console.log(`[Relay] injecting result for reqId=${reqId} result="${result.substring(0, 80)}"`);
+
+        const tx      = await contract.ownerHandleResponse(requestId, result);
+        const receipt = await tx.wait();
+        console.log(`[Relay] ownerHandleResponse confirmed — tx=${receipt.hash} pid=${pid} step=${stepN}`);
+
+      } catch (err) {
+        console.error(`[Relay] error executing step pid=${pid} step=${stepN}:`, err);
+        // Do not crash the relay — log and continue watching future events
       }
-
-      if (activeStep !== Number(step)) {
-        console.log(`[Relay] pipeline=${id} activeStep=${activeStep} != emitted step=${step} — skipping dispatchNext`);
-        return;
-      }
-
-      console.log(`[Relay] dispatching step ${Number(step) + 1} for pipeline=${id}`);
-      const tx = await signerContract.dispatchNext(pipelineId);
-      console.log(`[Relay] dispatchNext tx sent — hash=${tx.hash}`);
-      await tx.wait();
-      console.log(`[Relay] dispatchNext confirmed — pipeline=${id} step=${Number(step) + 1} started`);
-    } catch (err) {
-      console.error(`[Relay] dispatchNext failed for pipeline=${id}:`, err);
     }
+  );
+
+  contract.on("PipelineComplete", (pipelineId: bigint) => {
+    console.log(`[Relay] PipelineComplete pid=${pipelineId}`);
   });
 
-  pollContract.on("PipelineComplete", (pipelineId: bigint) => {
-    console.log(`[Relay] PipelineComplete — pipeline=${pipelineId.toString()}`);
+  contract.on("PipelineFailed", (pipelineId: bigint, step: bigint, reason: string) => {
+    console.error(`[Relay] PipelineFailed pid=${pipelineId} step=${step} reason=${reason}`);
   });
 
-  pollContract.on("PipelineFailed", (pipelineId: bigint, step: bigint, reason: string) => {
-    console.error(`[Relay] PipelineFailed — pipeline=${pipelineId.toString()} step=${step} reason=${reason}`);
-  });
-
-  provider.on("error", (err) => {
-    console.error("[Relay] Provider error:", err.message ?? err);
+  provider.on("error", (err: Error) => {
+    console.error("[Relay] provider error:", err?.message ?? err);
     _relayStarted = false;
     setTimeout(() => startRelayCoordinator(), 5_000);
   });
+}
+
+// -------------------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------------------
+
+// Cache: pipelineId → steps array (populated on first StepDispatched per pipeline)
+const _stepCache: Map<string, Array<{ agentType: number; inputTemplate: string }>> = new Map();
+
+async function getStepInputTemplate(
+  contract:   Contract,
+  pipelineId: bigint,
+  step:       bigint
+): Promise<string> {
+  const pid   = pipelineId.toString();
+  const stepN = Number(step);
+
+  // Serve from cache if available
+  const cached = _stepCache.get(pid);
+  if (cached?.[stepN]) return cached[stepN].inputTemplate;
+
+  // Fetch all step definitions via getPipelineSteps()
+  const steps = await contract.getPipelineSteps(pipelineId);
+  const mapped = steps.map((s: { agentType: bigint | number; inputTemplate: string }) => ({
+    agentType:     Number(s.agentType),
+    inputTemplate: s.inputTemplate,
+  }));
+  _stepCache.set(pid, mapped);
+  return mapped[stepN]?.inputTemplate ?? "";
 }
