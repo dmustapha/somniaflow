@@ -124,7 +124,7 @@ export default function HomePage() {
           textAlign: "center",
         }}>
           <div style={{
-            fontSize: "10px", fontWeight: 500, letterSpacing: "0.2em",
+            fontSize: "11px", fontWeight: 500, letterSpacing: "0.18em",
             textTransform: "uppercase", color: "var(--brand)",
             marginBottom: "28px", fontFamily: "var(--font-mono)",
             display: "flex", alignItems: "center", gap: "16px",
@@ -145,7 +145,7 @@ export default function HomePage() {
             marginBottom: "22px",
           }}>
             Chain AI agents together and{" "}
-            <em style={{ color: "var(--brand)" }}>record every<br />
+            <em style={{ color: "var(--brand)" }}>record every
             decision permanently on-chain.</em>
           </h1>
 
@@ -167,10 +167,10 @@ export default function HomePage() {
             margin: "0 auto 32px",
           }}>
             {[
-              { val: "LIVE",     label: "On Somnia blockchain",    color: "var(--ok)"      },
-              { val: "ON-CHAIN", label: "Decisions stored forever", color: "var(--ok)"      },
-              { val: "OPEN",     label: "Anyone can verify",        color: "var(--text-hi)" },
-              { val: "FAST",     label: "~1s block times",          color: "var(--text-hi)" },
+              { val: "LIVE",   label: "On Somnia testnet",  color: "var(--ok)"      },
+              { val: "4",      label: "Agents per pipeline", color: "var(--text-hi)" },
+              { val: "100%",   label: "On-chain verifiable", color: "var(--ok)"      },
+              { val: "<1s",    label: "Block times",          color: "var(--text-hi)" },
             ].map((s, i) => (
               <div key={i} style={{
                 padding: "12px 14px",
@@ -195,10 +195,10 @@ export default function HomePage() {
           {/* Demo CTAs */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=execute`}>
-              <button className="sf-btn-primary">Run demo: Execute path</button>
+              <button className="sf-btn-primary">Watch a live demo</button>
             </Link>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=skip`}>
-              <button className="sf-btn-ghost">Run demo: Skip path</button>
+              <button className="sf-btn-ghost">See the skip branch</button>
             </Link>
           </div>
           <div style={{ marginBottom: "48px" }}>
@@ -250,9 +250,6 @@ export default function HomePage() {
               Live demos
             </div>
             <div className="sf-glass" style={{ padding: "20px" }}>
-              <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-hi)", marginBottom: "14px" }}>
-                Demo pipelines
-              </div>
               <Suspense fallback={<PipelineSkeleton />}>
                 <PipelineList />
               </Suspense>
@@ -275,9 +272,12 @@ export default function HomePage() {
 
             <div className="sf-glass" style={{ padding: "20px" }}>
               <div style={{
-                display: "flex", alignItems: "center", justifyContent: "flex-end",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
                 marginBottom: "14px",
               }}>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-hi)", fontFamily: "var(--font-sans)" }}>
+                  Pipeline logic
+                </div>
                 <span style={{
                   fontSize: "10px", padding: "3px 8px",
                   border: "1px solid rgba(74,222,128,0.3)", color: "var(--ok)",
@@ -296,7 +296,7 @@ export default function HomePage() {
               ].map(({ k, v, cls }) => (
                 <div key={k} className="sf-dr">
                   <span className="sf-dr-key">{k}</span>
-                  <span className={`sf-dr-val ${cls}`} style={{ maxWidth: "220px", textAlign: "right" }}>{v}</span>
+                  <span className={`sf-dr-val ${cls}`} style={{ maxWidth: "260px", textAlign: "right" }}>{v}</span>
                 </div>
               ))}
 
@@ -308,7 +308,6 @@ export default function HomePage() {
                   style={{
                     fontSize: "11px", fontFamily: "var(--font-mono)",
                     color: "var(--brand)", textDecoration: "none",
-                    opacity: 0.7, transition: "opacity 0.15s",
                   }}
                 >
                   ↗ view contract on explorer
@@ -318,7 +317,6 @@ export default function HomePage() {
                   style={{
                     fontSize: "11px", fontFamily: "var(--font-mono)",
                     color: "var(--text-mid)", textDecoration: "none",
-                    opacity: 0.7,
                   }}
                 >
                   See all recorded decisions →

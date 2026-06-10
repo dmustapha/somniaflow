@@ -29,7 +29,7 @@ const TYPE_CONFIG: Record<number, { placeholder: string; hint: string }> = {
 
 const EXAMPLES = [
   {
-    name: "Market Intelligence (External Agents)",
+    name: "Market Intelligence",
     steps: [
       { agentType: 3 as const, inputTemplate: 'EXTERNAL|/api/agent/crypto-price|{"symbol":"eth"}', conditionalOnPrev: false, maxRetries: 2 },
       { agentType: 3 as const, inputTemplate: 'EXTERNAL|/api/agent/fear-greed|{}', conditionalOnPrev: false, maxRetries: 2 },
@@ -270,7 +270,7 @@ export default function ComposePage() {
                       if (sfAgents.length === 0) return null;
                       return (
                         <div style={{ marginBottom: "8px" }}>
-                          <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--ok)", letterSpacing: "0.1em", marginBottom: "4px" }}>
+                          <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ok)", letterSpacing: "0.08em", marginBottom: "4px" }}>
                             SOMNIAFLOW
                           </div>
                           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -302,7 +302,7 @@ export default function ComposePage() {
                       if (plAgents.length === 0) return null;
                       return (
                         <div style={{ marginBottom: "8px" }}>
-                          <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--brand)", letterSpacing: "0.1em", marginBottom: "4px" }}>
+                          <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--brand)", letterSpacing: "0.08em", marginBottom: "4px" }}>
                             PLATFORM
                           </div>
                           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -328,77 +328,68 @@ export default function ComposePage() {
                       );
                     })()}
 
-                    {/* Community agents — deduplicated, collapsed by default */}
+                    {/* Community agents — collapsed, deduped, callable-only when expanded */}
                     {(() => {
                       const comAgents = agents.filter(a => a.category === "community");
                       if (comAgents.length === 0) return null;
-                      // Deduplicate by name, keep first occurrence (prefer callable)
+                      // Deduplicate by normalized name (strip "(view)", whitespace, case)
                       const seen = new Set<string>();
                       const unique = comAgents
                         .sort((a, b) => (b.callable ? 1 : 0) - (a.callable ? 1 : 0))
                         .filter(a => {
-                          const key = a.name.toLowerCase().trim();
-                          if (seen.has(key)) return false;
+                          const key = a.name.toLowerCase().replace(/\s*\(view\)\s*/g, "").trim();
+                          if (!key || seen.has(key)) return false;
                           seen.add(key);
                           return true;
                         });
-                      const PREVIEW_COUNT = 6;
-                      const visible = communityOpen ? unique : unique.slice(0, PREVIEW_COUNT);
-                      const hiddenCount = unique.length - PREVIEW_COUNT;
+                      // Only show callable agents when expanded (non-callable are noise)
+                      const callable = unique.filter(a => a.callable);
+                      const totalOnChain = comAgents.length;
                       return (
                         <div style={{ marginBottom: "4px" }}>
                           <button
                             onClick={() => setCommunityOpen(prev => !prev)}
                             style={{
                               background: "none", border: "none", cursor: "pointer",
-                              fontSize: "9px", fontFamily: "var(--font-mono)",
-                              color: "rgba(96,165,250,0.7)", letterSpacing: "0.1em",
+                              fontSize: "10px", fontFamily: "var(--font-mono)",
+                              color: "rgba(96,165,250,0.5)", letterSpacing: "0.08em",
                               marginBottom: "4px", padding: 0,
                               display: "flex", alignItems: "center", gap: "4px",
                             }}
                           >
                             <span style={{ fontSize: "8px" }}>{communityOpen ? "▼" : "▶"}</span>
-                            COMMUNITY ({unique.length} unique)
+                            {communityOpen
+                              ? `COMMUNITY (${callable.length} callable)`
+                              : `+ ${totalOnChain} community agents on-chain`}
                           </button>
-                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                            {visible.map(a => (
-                              <button
-                                key={a.id}
-                                onClick={() => {
-                                  if (a.callable) {
-                                    updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id });
-                                  }
-                                }}
-                                title={a.callable ? a.description : `${a.description} (no callable endpoint)`}
-                                style={{
+                          {communityOpen && (
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                              {callable.length > 0 ? callable.map(a => (
+                                <button
+                                  key={a.id}
+                                  onClick={() => updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id })}
+                                  title={a.description}
+                                  style={{
+                                    fontSize: "11px", fontFamily: "var(--font-mono)",
+                                    padding: "5px 12px", cursor: "pointer",
+                                    border: `1px solid ${step.selectedAgentId === a.id ? "rgba(96,165,250,0.6)" : "rgba(96,165,250,0.15)"}`,
+                                    background: step.selectedAgentId === a.id ? "rgba(96,165,250,0.08)" : "transparent",
+                                    color: "rgba(96,165,250,0.7)",
+                                    transition: "all 0.15s",
+                                  }}
+                                >
+                                  {a.name}
+                                </button>
+                              )) : (
+                                <span style={{
                                   fontSize: "11px", fontFamily: "var(--font-mono)",
-                                  padding: "5px 12px",
-                                  cursor: a.callable ? "pointer" : "default",
-                                  border: `1px solid ${step.selectedAgentId === a.id ? "rgba(96,165,250,0.6)" : "rgba(96,165,250,0.15)"}`,
-                                  background: step.selectedAgentId === a.id ? "rgba(96,165,250,0.08)" : "transparent",
-                                  color: a.callable ? "rgba(96,165,250,0.7)" : "rgba(96,165,250,0.35)",
-                                  opacity: a.callable ? 1 : 0.6,
-                                  transition: "all 0.15s",
-                                }}
-                              >
-                                {a.name}
-                              </button>
-                            ))}
-                            {!communityOpen && hiddenCount > 0 && (
-                              <button
-                                onClick={() => setCommunityOpen(true)}
-                                style={{
-                                  fontSize: "11px", fontFamily: "var(--font-mono)",
-                                  padding: "5px 12px", cursor: "pointer",
-                                  border: "1px dashed rgba(96,165,250,0.2)",
-                                  background: "transparent",
-                                  color: "rgba(96,165,250,0.5)",
-                                }}
-                              >
-                                +{hiddenCount} more
-                              </button>
-                            )}
-                          </div>
+                                  color: "rgba(96,165,250,0.35)", padding: "5px 0",
+                                }}>
+                                  No callable community agents yet. {unique.length} registered (view-only).
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -431,8 +422,9 @@ export default function ComposePage() {
                       rows={3}
                       style={{
                         width: "100%", boxSizing: "border-box",
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid var(--border)",
+                        background: "rgba(0,0,0,0.3)",
+                        border: "1px solid rgba(22,45,66,0.8)",
+                        borderRadius: "4px",
                         color: "var(--text-hi)",
                         fontSize: "12px", fontFamily: "var(--font-mono)",
                         padding: "10px 12px", resize: "vertical",

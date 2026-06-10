@@ -232,7 +232,7 @@ export function StepCard({
                 </span>
                 {decision.swapPct > 0 && (
                   <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-lo)" }}>
-                    {decision.swapPct}% rebalance
+                    {decision.swapPct}% allocation
                   </span>
                 )}
                 <span style={{
@@ -305,7 +305,7 @@ export function StepCard({
                   rel="noopener noreferrer"
                   style={{
                     fontSize: "10px", fontFamily: "var(--font-mono)",
-                    color: "var(--brand)", opacity: 0.6,
+                    color: "var(--brand)", opacity: 0.8,
                     textDecoration: "none", marginLeft: "auto",
                     transition: "opacity 0.15s",
                   }}

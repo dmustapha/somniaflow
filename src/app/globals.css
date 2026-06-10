@@ -320,6 +320,20 @@ button .sf-glass,
   );
 }
 
+/* ─── Stat strip ─────────────────────────────────────────────────── */
+
+.sf-stat-grid {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* ─── Textarea dark scrollbar ────────────────────────────────────── */
+
+textarea {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 /* ─── Spinner ─────────────────────────────────────────────────────── */
 
 .sf-spinner {

@@ -126,9 +126,11 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
   const esRef = useRef<EventSource | null>(null);
 
   const stepCount = stepDefs.length > 0 ? stepDefs.length : steps.length;
-  const pipelineName = `Pipeline #${params.id}`;
+  const pipelineName = stepDefs.length > 0
+    ? stepDefs.map(d => stepLabel(d)).join(" → ")
+    : `Pipeline #${params.id}`;
   const pipelineTagline = stepDefs.length > 0
-    ? stepDefs.map(d => stepLabel(d)).join(" · ")
+    ? `${stepCount} agents · on-chain orchestration`
     : `${stepCount} steps`;
 
   const sseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -379,8 +381,8 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
           <Link
             href="/"
             style={{
-              fontSize: "11px", fontFamily: "var(--font-mono)",
-              color: "var(--text-lo)", textDecoration: "none",
+              fontSize: "12px", fontFamily: "var(--font-mono)",
+              color: "var(--text-mid)", textDecoration: "none",
               marginBottom: "14px", display: "inline-block",
             }}
           >
@@ -388,7 +390,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
           </Link>
 
           <div style={{
-            fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em",
+            fontSize: "12px", fontWeight: 600, letterSpacing: "0.1em",
             textTransform: "uppercase", color: "var(--brand)",
             marginBottom: "18px", fontFamily: "var(--font-sans)",
           }}>
@@ -406,7 +408,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
           </h1>
           <div style={{
             fontSize: "13px", fontFamily: "var(--font-mono)",
-            color: "var(--text-lo)", marginBottom: "14px",
+            color: "var(--text-mid)", marginBottom: "14px",
           }}>
             {pipelineTagline}
           </div>
@@ -499,7 +501,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               color: "var(--text-hi)", marginBottom: "12px",
               fontFamily: "var(--font-sans)",
             }}>
-              {pipelineName}
+              How this pipeline works
             </div>
             <p style={{
               fontSize: "12px", color: "var(--text-mid)",
@@ -507,8 +509,8 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               fontFamily: "var(--font-sans)",
             }}>
               {stepDefs.length > 0
-                ? stepDefs.map((d, i) => `Step ${i + 1}: ${stepLabel(d)}`).join(" → ")
-                : "Multi-agent pipeline running on Somnia blockchain"}
+                ? `${stepCount} agents run in sequence. Each step's output feeds into the next. The smart contract records every result on-chain.`
+                : "Multi-agent pipeline running on Somnia blockchain."}
             </p>
             <div style={{
               padding: "10px 12px", marginBottom: "8px",
@@ -549,36 +551,36 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button
-                onClick={handleTrigger}
-                disabled={isRunning}
-                className="sf-btn-primary"
-                title="Triggers a real on-chain transaction — requires a funded pipeline wallet"
-                style={{ width: "100%", textAlign: "center" }}
-              >
-                {triggering ? "starting…" : "▶ Trigger pipeline on-chain"}
-              </button>
-              <div style={{
-                fontSize: "11px", color: "var(--text-lo)",
-                fontFamily: "var(--font-mono)", textAlign: "center",
-                letterSpacing: "0.06em",
-              }}>
-                or try a demo
-              </div>
-              <button
                 onClick={() => handleSimulate("execute")}
                 disabled={isRunning}
-                className="sf-btn-ghost"
-                style={{ width: "100%", textAlign: "center", fontSize: "11px" }}
+                className="sf-btn-primary"
+                style={{ width: "100%", textAlign: "center" }}
               >
-                Demo: Execute all steps
+                {isRunning ? "Running..." : "▶ Run demo: all steps execute"}
               </button>
               <button
                 onClick={() => handleSimulate("skip")}
                 disabled={isRunning}
                 className="sf-btn-ghost"
+                style={{ width: "100%", textAlign: "center" }}
+              >
+                Run demo: AI skips a step
+              </button>
+              <div style={{
+                fontSize: "10px", color: "var(--text-lo)",
+                fontFamily: "var(--font-mono)", textAlign: "center",
+                letterSpacing: "0.06em", marginTop: "4px",
+              }}>
+                or trigger a real on-chain run
+              </div>
+              <button
+                onClick={handleTrigger}
+                disabled={isRunning}
+                className="sf-btn-ghost"
+                title="Triggers a real on-chain transaction — requires a funded pipeline wallet"
                 style={{ width: "100%", textAlign: "center", fontSize: "11px" }}
               >
-                Demo: Skip conditional step
+                Trigger pipeline on-chain
               </button>
             </div>
 
@@ -678,7 +680,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                   href="/proof"
                   style={{
                     fontSize: "11px", fontFamily: "var(--font-mono)",
-                    color: "var(--text-mid)", textDecoration: "none", opacity: 0.7,
+                    color: "var(--text-mid)", textDecoration: "none",
                   }}
                 >
                   See all recorded decisions →
@@ -689,7 +691,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                   rel="noopener noreferrer"
                   style={{
                     fontSize: "11px", fontFamily: "var(--font-mono)",
-                    color: "var(--brand)", textDecoration: "none", opacity: 0.7,
+                    color: "var(--brand)", textDecoration: "none",
                   }}
                 >
                   ↗ verify on explorer

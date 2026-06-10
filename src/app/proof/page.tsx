@@ -289,7 +289,7 @@ export default async function ProofPage() {
               Contract Address
             </div>
             <a
-              href={`${EXPLORER}/address/${REGISTRY || "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1"}`}
+              href={`${EXPLORER}/address/${REGISTRY}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -298,7 +298,7 @@ export default async function ProofPage() {
                 wordBreak: "break-all", lineHeight: 1.5,
               }}
             >
-              {REGISTRY || "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1"} ↗
+              {REGISTRY} ↗
             </a>
           </div>
         </div>
@@ -317,8 +317,8 @@ export default async function ProofPage() {
             margin: 0, fontFamily: "var(--font-sans)",
           }}>
             Click any transaction hash above to see it on the Somnia blockchain explorer. When the AI
-            decides EXECUTE, all 4 steps run and are recorded. When it decides SKIP, the contract
-            blocks the conditional step automatically, so you see 3 records instead of 4.
+            decides EXECUTE, all steps run and are recorded. When it decides SKIP, the contract
+            blocks the conditional step automatically, so you see fewer records.
           </p>
         </div>
 
