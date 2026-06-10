@@ -8,10 +8,10 @@ const DEMO_PIPELINE_IDS = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1,2")
   .split(",")
   .map(s => s.trim());
 
-const REGISTRY_ADDR  = "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6";
+const REGISTRY_ADDR  = "0xE1264BB2a3961d616D965b78873800682571eCbC";
 const REGISTRY_SHORT = `0x${REGISTRY_ADDR.slice(2, 6)}\u2026${REGISTRY_ADDR.slice(-4)}`;
 
-const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse" };
+const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse", 3: "External" };
 
 const STATUS_COLOR: Record<string, string> = {
   Idle:     "var(--text-lo)",

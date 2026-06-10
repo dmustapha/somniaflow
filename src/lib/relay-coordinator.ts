@@ -31,7 +31,7 @@ const RELAY_ABI = [
 ];
 
 const HTTP_RPC         = process.env.NEXT_PUBLIC_RPC_URL ?? "https://dream-rpc.somnia.network";
-const REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc").trim();
+const REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0xE1264BB2a3961d616D965b78873800682571eCbC").trim();
 const SHANNON_NETWORK  = new ethers.Network("somnia-shannon", 50312);
 
 let _relayStarted = false;

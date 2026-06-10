@@ -630,7 +630,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                   See all recorded decisions →
                 </Link>
                 <a
-                  href={`${EXPLORER}/address/${process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc"}`}
+                  href={`${EXPLORER}/address/${process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0xE1264BB2a3961d616D965b78873800682571eCbC"}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{

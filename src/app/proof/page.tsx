@@ -4,7 +4,7 @@ import { getPipelineState, getTransactionHistory, getStepDefinitions } from "@/l
 import { parsePipelineDecision } from "@/lib/parse-decision";
 import { SiteNav } from "@/components/SiteNav";
 
-const REGISTRY  = "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6";
+const REGISTRY  = "0xE1264BB2a3961d616D965b78873800682571eCbC";
 const EXPLORER  = "https://shannon-explorer.somnia.network";
 const CHAIN_ID  = 50312;
 
@@ -12,7 +12,7 @@ const DEMO_IDS  = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1,2")
   .split(",")
   .map(s => s.trim());
 
-const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse" };
+const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse", 3: "External" };
 
 export default async function ProofPage() {
   // Fetch pipeline states, step defs, and TX history in parallel
@@ -290,7 +290,7 @@ export default async function ProofPage() {
               Contract Address
             </div>
             <a
-              href={`${EXPLORER}/address/${REGISTRY || "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6"}`}
+              href={`${EXPLORER}/address/${REGISTRY || "0xE1264BB2a3961d616D965b78873800682571eCbC"}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -299,7 +299,7 @@ export default async function ProofPage() {
                 wordBreak: "break-all", lineHeight: 1.5,
               }}
             >
-              {REGISTRY || "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6"} ↗
+              {REGISTRY || "0xE1264BB2a3961d616D965b78873800682571eCbC"} ↗
             </a>
           </div>
         </div>
