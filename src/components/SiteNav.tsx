@@ -35,15 +35,8 @@ export function SiteNav({ right }: SiteNavProps) {
         padding: "13px 36px",
         display: "flex", alignItems: "center", gap: "12px",
       }}>
-        <Link
-          href="/"
-          style={{
-            fontSize: "17px", fontWeight: 400, fontStyle: "italic",
-            color: "var(--text-hi)", fontFamily: "var(--font-serif)",
-            textDecoration: "none", flexShrink: 0,
-          }}
-        >
-          Somnia<span style={{ color: "var(--brand)" }}>Flow</span>
+        <Link href="/" style={{ textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center" }}>
+          <img src="/logo-v3.svg" alt="SomniaFlow" height={32} style={{ display: "block" }} />
         </Link>
         <span style={{ width: "1px", height: "14px", background: "var(--border)", flexShrink: 0 }} />
         <nav style={{ display: "flex", alignItems: "center", gap: "20px" }}>

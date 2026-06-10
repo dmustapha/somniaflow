@@ -1,0 +1,38 @@
+<svg viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- SomniaFlow Combination Mark V3 — dark navy background -->
+  <rect width="200" height="40" rx="6" fill="#060c18"/>
+
+  <!-- === Icon: 3-node constellation pipeline === -->
+  <line x1="7" y1="27" x2="13" y2="19" stroke="#1a3548" stroke-width="1.25" stroke-linecap="round"/>
+  <line x1="15" y1="17" x2="20.5" y2="11.5" stroke="#22d3ee" stroke-width="1.25" stroke-linecap="round" opacity="0.65"/>
+
+  <!-- Node 1 dim -->
+  <circle cx="5.5" cy="28.5" r="3" fill="#060c18" stroke="#1a3548" stroke-width="1.25"/>
+  <!-- Node 2 mid -->
+  <circle cx="14" cy="18" r="3.5" fill="#060c18" stroke="#7fa8b8" stroke-width="1.25"/>
+  <circle cx="14" cy="18" r="1.25" fill="#7fa8b8" opacity="0.55"/>
+  <!-- Node 3 brand -->
+  <circle cx="22" cy="10" r="4" fill="#22d3ee" opacity="0.12"/>
+  <circle cx="22" cy="10" r="3" fill="#22d3ee"/>
+  <circle cx="22" cy="10" r="5" fill="none" stroke="#22d3ee" stroke-width="0.6" opacity="0.3"/>
+
+  <!-- === Text: italic serif, nav-style === -->
+  <text
+    x="34" y="27"
+    font-family="'Georgia', 'Times New Roman', serif"
+    font-size="18"
+    font-weight="400"
+    font-style="italic"
+    fill="#e8f4f8"
+    letter-spacing="-0.01em"
+  >Somnia</text>
+  <text
+    x="105" y="27"
+    font-family="'Georgia', 'Times New Roman', serif"
+    font-size="18"
+    font-weight="400"
+    font-style="italic"
+    fill="#22d3ee"
+    letter-spacing="-0.01em"
+  >Flow</text>
+</svg>

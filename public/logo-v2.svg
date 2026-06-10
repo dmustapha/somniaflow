@@ -1,0 +1,31 @@
+<svg viewBox="0 0 220 44" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- SomniaFlow Wordmark V2 -->
+  <!-- "SOMNIA" light + thin hairline divider + "FLOW" cyan with tracking -->
+
+  <!-- "SOMNIA" — light, tracked, sans letterforms as paths at y-baseline 30 -->
+  <!-- Rendered via text for now; convert to outlines for production -->
+  <text
+    x="8" y="29"
+    font-family="'Inter', 'SF Pro Display', system-ui, sans-serif"
+    font-size="22"
+    font-weight="300"
+    letter-spacing="0.18em"
+    fill="#e8f4f8"
+  >SOMNIA</text>
+
+  <!-- Thin hairline separator -->
+  <line x1="147" y1="10" x2="147" y2="34" stroke="#1a3548" stroke-width="1"/>
+
+  <!-- "FLOW" — brand cyan, slightly heavier, same tracking -->
+  <text
+    x="153" y="29"
+    font-family="'Inter', 'SF Pro Display', system-ui, sans-serif"
+    font-size="22"
+    font-weight="500"
+    letter-spacing="0.18em"
+    fill="#22d3ee"
+  >FLOW</text>
+
+  <!-- Subtle underline accent on FLOW -->
+  <line x1="153" y1="35" x2="214" y2="35" stroke="#22d3ee" stroke-width="1" opacity="0.4"/>
+</svg>

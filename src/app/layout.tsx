@@ -28,6 +28,10 @@ export const metadata: Metadata = {
   title: "SomniaFlow — On-Chain Agent Orchestration",
   description:
     "First multi-agent orchestration protocol on Somnia. Agents coordinated and verified on-chain via Shannon testnet. No off-chain coordinator.",
+  icons: {
+    icon: "/logo-v1.svg",
+    shortcut: "/logo-v1.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
