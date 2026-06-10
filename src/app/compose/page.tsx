@@ -74,6 +74,7 @@ export default function ComposePage() {
   const [pipelineId,    setPipelineId]   = useState<string | null>(null);
   const [agents,        setAgents]       = useState<SomniaAgent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
+  const [communityOpen, setCommunityOpen] = useState(false);
 
   // Fetch live agents from Somnia registry on mount
   useEffect(() => {
@@ -327,17 +328,40 @@ export default function ComposePage() {
                       );
                     })()}
 
-                    {/* Community agents (AETHON etc) — dimmed, non-callable shown differently */}
+                    {/* Community agents — deduplicated, collapsed by default */}
                     {(() => {
                       const comAgents = agents.filter(a => a.category === "community");
                       if (comAgents.length === 0) return null;
+                      // Deduplicate by name, keep first occurrence (prefer callable)
+                      const seen = new Set<string>();
+                      const unique = comAgents
+                        .sort((a, b) => (b.callable ? 1 : 0) - (a.callable ? 1 : 0))
+                        .filter(a => {
+                          const key = a.name.toLowerCase().trim();
+                          if (seen.has(key)) return false;
+                          seen.add(key);
+                          return true;
+                        });
+                      const PREVIEW_COUNT = 6;
+                      const visible = communityOpen ? unique : unique.slice(0, PREVIEW_COUNT);
+                      const hiddenCount = unique.length - PREVIEW_COUNT;
                       return (
                         <div style={{ marginBottom: "4px" }}>
-                          <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "rgba(96,165,250,0.7)", letterSpacing: "0.1em", marginBottom: "4px" }}>
-                            COMMUNITY ({comAgents.length})
-                          </div>
+                          <button
+                            onClick={() => setCommunityOpen(prev => !prev)}
+                            style={{
+                              background: "none", border: "none", cursor: "pointer",
+                              fontSize: "9px", fontFamily: "var(--font-mono)",
+                              color: "rgba(96,165,250,0.7)", letterSpacing: "0.1em",
+                              marginBottom: "4px", padding: 0,
+                              display: "flex", alignItems: "center", gap: "4px",
+                            }}
+                          >
+                            <span style={{ fontSize: "8px" }}>{communityOpen ? "▼" : "▶"}</span>
+                            COMMUNITY ({unique.length} unique)
+                          </button>
                           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                            {comAgents.map(a => (
+                            {visible.map(a => (
                               <button
                                 key={a.id}
                                 onClick={() => {
@@ -357,9 +381,23 @@ export default function ComposePage() {
                                   transition: "all 0.15s",
                                 }}
                               >
-                                {a.name}{!a.callable ? " (view)" : ""}
+                                {a.name}
                               </button>
                             ))}
+                            {!communityOpen && hiddenCount > 0 && (
+                              <button
+                                onClick={() => setCommunityOpen(true)}
+                                style={{
+                                  fontSize: "11px", fontFamily: "var(--font-mono)",
+                                  padding: "5px 12px", cursor: "pointer",
+                                  border: "1px dashed rgba(96,165,250,0.2)",
+                                  background: "transparent",
+                                  color: "rgba(96,165,250,0.5)",
+                                }}
+                              >
+                                +{hiddenCount} more
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
