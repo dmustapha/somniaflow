@@ -9,12 +9,12 @@ import type { PipelineSSEEvent } from "@/types";
 function makeLLMResult(branch: "execute" | "skip"): string {
   if (branch === "execute") {
     return `DECISION: EXECUTE
-REASONING: Input data value is 1627.63, which is 12.4% below the 30-day average. Signal strength is high and conditions favor proceeding with execution. All risk thresholds are within acceptable bounds.
+REASONING: ETH is trading at $2,547, down 3.2% today but still above key support levels. Market sentiment is in the greed zone and trending upward. The risk assessment gave a passing score of 68/100. All three signals agree: this looks like a good time to enter a position.
 SWAP_AMOUNT_PCT: 20
 CONFIDENCE: MEDIUM`;
   }
   return `DECISION: SKIP
-REASONING: Input data shows elevated volatility. Current signal strength does not meet execution threshold. Conditions favor waiting for confirmation before proceeding — risk/reward does not justify immediate action.
+REASONING: ETH is down 3.2% and showing high volatility. Market sentiment is in the fear zone at 28/100 and falling. The risk score came back at 31/100, well below the safety threshold. Two out of three signals say wait. Better to sit this one out.
 SWAP_AMOUNT_PCT: 0
 CONFIDENCE: MEDIUM`;
 }
@@ -22,12 +22,12 @@ CONFIDENCE: MEDIUM`;
 function makeRiskEvalResult(branch: "execute" | "skip"): string {
   if (branch === "execute") {
     return `DECISION: EXECUTE
-REASONING: Algorithmic risk assessment: momentum score 72/100 (bullish), sentiment index 65 (greed zone), volume trend +18% above 7d avg. Composite risk score 68/100 passes execution threshold of 55. All three signal components align — favorable for position entry.
+REASONING: Market momentum is strong at 72/100. Sentiment is in the greed zone. Trading volume is up 18% compared to last week. Overall risk score: 68/100, which clears the safety threshold of 55. All three indicators line up in favor of trading.
 SWAP_AMOUNT_PCT: 15
 CONFIDENCE: HIGH`;
   }
   return `DECISION: SKIP
-REASONING: Algorithmic risk assessment: momentum score 38/100 (bearish divergence), sentiment index 28 (fear zone), volume trend -12% below 7d avg. Composite risk score 31/100 below execution threshold of 55. Two of three signals negative — hold position.
+REASONING: Market momentum is weak at 38/100 with bearish signals. Sentiment is in the fear zone. Trading volume is down 12% compared to last week. Overall risk score: 31/100, below the safety threshold of 55. Two out of three indicators say hold off.
 SWAP_AMOUNT_PCT: 0
 CONFIDENCE: HIGH`;
 }
@@ -72,8 +72,8 @@ export async function emitPipelineRun(id: string, branch: "execute" | "skip", st
   const riskDecision = {
     decision:   (branch === "execute" ? "EXECUTE" : "SKIP") as "EXECUTE" | "SKIP",
     reasoning:  branch === "execute"
-      ? "Composite risk score 68/100 passes threshold — all signals align"
-      : "Composite risk score 31/100 below threshold — two signals negative",
+      ? "Risk score 68/100 clears the safety threshold. All three indicators agree: good conditions for trading."
+      : "Risk score 31/100 is below the safety threshold. Two out of three indicators say wait.",
     swapPct:    branch === "execute" ? 15 : 0,
     confidence: "HIGH" as const,
   };

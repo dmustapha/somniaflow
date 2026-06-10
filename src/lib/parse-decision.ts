@@ -13,10 +13,13 @@ export function parsePipelineDecision(llmResult: string): PipelineDecision {
   const confMatch = llmResult.match(/CONFIDENCE:\s*(HIGH|MEDIUM|LOW)/i)?.[1]?.toUpperCase() as
     "HIGH" | "MEDIUM" | "LOW" | undefined;
 
+  const swapMatch = llmResult.match(/SWAP_AMOUNT_PCT:\s*(\d+)/i)?.[1];
+  const swapPct = swapMatch ? Number(swapMatch) : (isExecute ? 20 : 0);
+
   return {
     decision:   isExecute ? "EXECUTE" : "SKIP",
     reasoning,
-    swapPct:    isExecute ? 20 : 0,
+    swapPct,
     confidence: confMatch ?? "MEDIUM",
   };
 }

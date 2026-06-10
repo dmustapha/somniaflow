@@ -713,12 +713,22 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                 </span>
               </div>
 
+              <p style={{
+                fontSize: "12px", color: "var(--text-mid)",
+                fontFamily: "var(--font-sans)", lineHeight: 1.55,
+                margin: "0 0 12px",
+              }}>
+                {stepDefs.length > 0
+                  ? `This workflow checked live market data across ${steps.filter(s => s.status === "complete").length} steps, then AI analyzed everything to decide whether market conditions are good right now.`
+                  : `The workflow ran ${steps.filter(s => s.status === "complete").length} AI steps and recorded each result.`}
+              </p>
               {decision && (
                 <div className="sf-dr">
                   <span className="sf-dr-key">AI verdict</span>
                   <span className={`sf-dr-val ${decision.decision === "EXECUTE" ? "ok" : ""}`}>
-                    {decision.decision === "EXECUTE" ? "Proceed with trade" : "Skip this time"}
-                    {decision.swapPct > 0 && ` · ${decision.swapPct}% allocation`}
+                    {decision.decision === "EXECUTE"
+                      ? `Conditions are favorable${decision.swapPct > 0 ? ` · suggested ${decision.swapPct}% of portfolio` : ""}`
+                      : "Conditions are unfavorable · hold off for now"}
                   </span>
                 </div>
               )}
