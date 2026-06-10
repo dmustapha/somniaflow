@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getPipelineState, getTransactionHistory, getStepDefinitions } from "@/lib/pipeline-service";
 import { parsePipelineDecision } from "@/lib/parse-decision";
 import { SiteNav } from "@/components/SiteNav";
+import { agentDisplayName } from "@/lib/agent-display";
 
 const REGISTRY  = "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1";
 const EXPLORER  = "https://shannon-explorer.somnia.network";
@@ -11,8 +12,6 @@ const CHAIN_ID  = 50312;
 const DEMO_IDS  = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1,2")
   .split(",")
   .map(s => s.trim());
-
-const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse", 3: "External" };
 
 export default async function ProofPage() {
   // Fetch pipeline states, step defs, and TX history in parallel
@@ -36,7 +35,7 @@ export default async function ProofPage() {
           textTransform: "uppercase", color: "var(--brand)",
           marginBottom: "14px", fontFamily: "var(--font-sans)",
         }}>
-          Every decision is permanently recorded
+          On-chain proof
         </div>
 
         <h1 style={{
@@ -74,7 +73,7 @@ export default async function ProofPage() {
           const decision   = llmResult ? parsePipelineDecision(llmResult) : null;
 
           const pipelineName = stepDefs.length > 0
-            ? stepDefs.map(d => AGENT_TYPE_NAMES[d.agentType]).join(" → ")
+            ? stepDefs.map(d => agentDisplayName(d)).join(" → ")
             : `Pipeline #${id}`;
 
           return (
@@ -228,7 +227,7 @@ export default async function ProofPage() {
                     return (
                       <div key={i} className="sf-dr">
                         <span className="sf-dr-key">
-                          Step {i + 1}{def ? ` — ${AGENT_TYPE_NAMES[def.agentType]}` : ""}
+                          Step {i + 1}{def ? ` — ${agentDisplayName(def)}` : ""}
                         </span>
                         <span className="sf-dr-val hi" style={{ maxWidth: "280px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {result.length > 60 ? `${result.slice(0, 60)}…` : result}
@@ -317,9 +316,9 @@ export default async function ProofPage() {
             fontSize: "12px", color: "var(--text-mid)", lineHeight: 1.6,
             margin: 0, fontFamily: "var(--font-sans)",
           }}>
-            Click any transaction record above to see it on the blockchain. If the AI decided to
-            rebalance, you&apos;ll see 3 records. If it decided to wait, only 2 — the smart contract
-            blocked the third step automatically.
+            Click any transaction hash above to see it on the Somnia blockchain explorer. When the AI
+            decides EXECUTE, all 4 steps run and are recorded. When it decides SKIP, the contract
+            blocks the conditional step automatically, so you see 3 records instead of 4.
           </p>
         </div>
 

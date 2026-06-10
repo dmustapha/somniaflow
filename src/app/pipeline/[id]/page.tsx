@@ -18,8 +18,17 @@ const AGENT_LABELS: Record<number, { name: string; sublabel: string }> = {
 };
 
 function stepLabel(def: PipelineStepDef): string {
+  // For EXTERNAL agents, extract name from /api/agent/{name} pattern
+  if (def.agentType === 3) {
+    const match = def.inputTemplate.match(/\/api\/agent\/([^|"}\s]+)/);
+    if (match) {
+      return match[1]
+        .split('-')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+  }
   const base = AGENT_LABELS[def.agentType]?.name ?? "Agent";
-  // Try to extract a readable URL from the template
   const urlMatch = def.inputTemplate.match(/^(https?:\/\/[^\s|]+)/);
   if (urlMatch) {
     try { return `${base}: ${new URL(urlMatch[1]).hostname}`; } catch { /* fall through */ }
@@ -119,7 +128,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
   const stepCount = stepDefs.length > 0 ? stepDefs.length : steps.length;
   const pipelineName = `Pipeline #${params.id}`;
   const pipelineTagline = stepDefs.length > 0
-    ? stepDefs.map(d => AGENT_LABELS[d.agentType]?.name ?? "Agent").join(" · ")
+    ? stepDefs.map(d => stepLabel(d)).join(" · ")
     : `${stepCount} steps`;
 
   const sseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -367,6 +376,17 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
             display: "flex", flexDirection: "column",
           }}
         >
+          <Link
+            href="/"
+            style={{
+              fontSize: "11px", fontFamily: "var(--font-mono)",
+              color: "var(--text-lo)", textDecoration: "none",
+              marginBottom: "14px", display: "inline-block",
+            }}
+          >
+            ← Back to home
+          </Link>
+
           <div style={{
             fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em",
             textTransform: "uppercase", color: "var(--brand)",
@@ -487,7 +507,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               fontFamily: "var(--font-sans)",
             }}>
               {stepDefs.length > 0
-                ? stepDefs.map((d, i) => `Step ${i + 1}: ${AGENT_LABELS[d.agentType]?.name}`).join(" → ")
+                ? stepDefs.map((d, i) => `Step ${i + 1}: ${stepLabel(d)}`).join(" → ")
                 : "Multi-agent pipeline running on Somnia blockchain"}
             </p>
             <div style={{
@@ -535,14 +555,14 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                 title="Triggers a real on-chain transaction — requires a funded pipeline wallet"
                 style={{ width: "100%", textAlign: "center" }}
               >
-                {triggering ? "starting…" : "▶ Trigger live on-chain"}
+                {triggering ? "starting…" : "▶ Trigger pipeline on-chain"}
               </button>
               <div style={{
-                fontSize: "10px", color: "var(--text-lo)",
+                fontSize: "11px", color: "var(--text-lo)",
                 fontFamily: "var(--font-mono)", textAlign: "center",
                 letterSpacing: "0.06em",
               }}>
-                — or try a demo —
+                or try a demo
               </div>
               <button
                 onClick={() => handleSimulate("execute")}
@@ -550,7 +570,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                 className="sf-btn-ghost"
                 style={{ width: "100%", textAlign: "center", fontSize: "11px" }}
               >
-                Demo: AI executes all steps
+                Demo: Execute all steps
               </button>
               <button
                 onClick={() => handleSimulate("skip")}
@@ -558,7 +578,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                 className="sf-btn-ghost"
                 style={{ width: "100%", textAlign: "center", fontSize: "11px" }}
               >
-                Demo: AI skips a step
+                Demo: Skip conditional step
               </button>
             </div>
 
@@ -624,7 +644,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                     marginBottom: "4px", fontFamily: "var(--font-mono)",
                   }}>
                     This is a demo run — no on-chain transactions.
-                    Use &ldquo;Trigger live on-chain&rdquo; to record real blockchain data.
+                    Use &ldquo;Trigger pipeline on-chain&rdquo; to record real blockchain data.
                   </div>
                 </div>
               ) : txHashes.length > 0 && (

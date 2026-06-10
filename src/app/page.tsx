@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { getPipelineState, getStepDefinitions } from "@/lib/pipeline-service";
 import { LiveBlock } from "@/components/LiveBlock";
 import { SiteNav } from "@/components/SiteNav";
+import { agentDisplayName } from "@/lib/agent-display";
 
 const DEMO_PIPELINE_IDS = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1,2")
   .split(",")
@@ -10,8 +11,6 @@ const DEMO_PIPELINE_IDS = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1,2")
 
 const REGISTRY_ADDR  = "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1";
 const REGISTRY_SHORT = `0x${REGISTRY_ADDR.slice(2, 6)}\u2026${REGISTRY_ADDR.slice(-4)}`;
-
-const AGENT_TYPE_NAMES: Record<number, string> = { 0: "JSON API", 1: "AI Inference", 2: "Web Parse", 3: "External" };
 
 const STATUS_COLOR: Record<string, string> = {
   Idle:     "var(--text-lo)",
@@ -44,11 +43,11 @@ async function PipelineList() {
         const state     = result.value;
         const stepDefs  = stepResults[i]?.status === "fulfilled" ? stepResults[i].value : [];
         const pipeName  = stepDefs.length > 0
-          ? stepDefs.map(d => AGENT_TYPE_NAMES[d.agentType]).join(" → ")
+          ? stepDefs.map(d => agentDisplayName(d)).join(" → ")
           : `Pipeline #${id}`;
         const pipeDesc  = stepDefs.length > 0
           ? `${stepDefs.length} agents · on-chain orchestration`
-          : "3 agents";
+          : "Multi-agent pipeline";
         const dotColor  = STATUS_COLOR[state.status] ?? "var(--text-lo)";
         const isRunning = state.status === "Running";
 
@@ -74,7 +73,7 @@ async function PipelineList() {
                 <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-hi)", marginBottom: "3px" }}>
                   {pipeName}
                 </div>
-                <div style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-lo)" }}>
+                <div style={{ fontSize: "12px", fontFamily: "var(--font-mono)", color: "var(--text-lo)" }}>
                   {pipeDesc}
                 </div>
               </div>
@@ -117,7 +116,7 @@ export default function HomePage() {
         display: "flex", alignItems: "center",
         borderBottom: "1px solid var(--border)",
       }}>
-        <div style={{
+        <div className="sf-hero-inner" style={{
           maxWidth: "720px",
           margin: "0 auto",
           padding: "60px 36px",
@@ -155,14 +154,13 @@ export default function HomePage() {
             maxWidth: "560px", marginBottom: "36px",
             fontFamily: "var(--font-sans)",
           }}>
-            SomniaFlow runs sequences of AI agents coordinated by a smart contract.
-            Each step can fetch data, run LLM inference, or parse the web.
-            The contract decides which steps execute based on each agent&apos;s output.
-            No server, no human in the loop — the logic is transparent and anyone can audit it.
+            No server, no human in the loop. SomniaFlow chains AI agents into multi-step
+            pipelines where a smart contract decides what runs next. Every decision is
+            transparent and anyone can audit it on the blockchain.
           </p>
 
           {/* Plain-English stat strip */}
-          <div style={{
+          <div className="sf-stat-grid" style={{
             display: "grid", gridTemplateColumns: "repeat(4,1fr)",
             border: "1px solid var(--border)",
             maxWidth: "540px", marginBottom: "32px",
@@ -185,8 +183,8 @@ export default function HomePage() {
                   {s.val}
                 </div>
                 <div style={{
-                  fontSize: "10px", fontWeight: 600, textTransform: "uppercase",
-                  letterSpacing: "0.1em", color: "var(--text-lo)", fontFamily: "var(--font-sans)",
+                  fontSize: "11px", fontWeight: 600, textTransform: "uppercase",
+                  letterSpacing: "0.1em", color: "var(--text-mid)", fontFamily: "var(--font-sans)",
                 }}>
                   {s.label}
                 </div>
@@ -197,22 +195,23 @@ export default function HomePage() {
           {/* Demo CTAs */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=execute`}>
-              <button className="sf-btn-primary">Run demo: AI executes all steps</button>
+              <button className="sf-btn-primary">Run demo: Execute path</button>
             </Link>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=skip`}>
-              <button className="sf-btn-ghost">Run demo: AI skips a step</button>
+              <button className="sf-btn-ghost">Run demo: Skip path</button>
             </Link>
           </div>
           <div style={{ marginBottom: "48px" }}>
             <Link
               href="/compose"
+              className="sf-btn-ghost"
               style={{
                 fontSize: "13px", fontFamily: "var(--font-sans)",
-                color: "var(--text-mid)", textDecoration: "none",
-                letterSpacing: "0.02em",
+                padding: "8px 20px",
+                display: "inline-flex", alignItems: "center", gap: "6px",
               }}
             >
-              or build your own pipeline →
+              Build your own pipeline <span style={{ fontSize: "16px" }}>→</span>
             </Link>
           </div>
 
@@ -223,7 +222,7 @@ export default function HomePage() {
             display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
           }}>
             <span>↓</span>
-            <span>see live demo below</span>
+            <span>see demo pipelines below</span>
           </div>
         </div>
       </section>
@@ -276,12 +275,9 @@ export default function HomePage() {
 
             <div className="sf-glass" style={{ padding: "20px" }}>
               <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
+                display: "flex", alignItems: "center", justifyContent: "flex-end",
                 marginBottom: "14px",
               }}>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-hi)", lineHeight: 1.1 }}>
-                  How It Works
-                </div>
                 <span style={{
                   fontSize: "10px", padding: "3px 8px",
                   border: "1px solid rgba(74,222,128,0.3)", color: "var(--ok)",

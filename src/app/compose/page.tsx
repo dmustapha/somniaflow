@@ -525,26 +525,14 @@ export default function ComposePage() {
 
         {/* Info */}
         <div style={{
-          marginTop: "32px", padding: "16px",
+          marginTop: "32px", padding: "14px 16px",
           border: "1px solid var(--border)",
           background: "rgba(255,255,255,0.01)",
+          fontSize: "12px", color: "var(--text-lo)",
+          fontFamily: "var(--font-sans)", lineHeight: 1.6,
         }}>
-          <div style={{
-            fontSize: "11px", fontFamily: "var(--font-mono)",
-            color: "var(--text-lo)", marginBottom: "8px",
-          }}>
-            HOW IT WORKS
-          </div>
-          <ol style={{
-            margin: 0, paddingLeft: "20px",
-            fontSize: "12px", color: "var(--text-mid)",
-            fontFamily: "var(--font-sans)", lineHeight: 1.7,
-          }}>
-            <li>Your pipeline is registered as a smart contract call on Somnia Shannon testnet</li>
-            <li>When triggered, each step is dispatched to our relay which executes the agent</li>
-            <li>Results are written back on-chain via <code style={{ fontFamily: "var(--font-mono)", fontSize: "11px" }}>ownerHandleResponse()</code></li>
-            <li>Every step result is permanently recorded and verifiable on the blockchain explorer</li>
-          </ol>
+          Your pipeline registers as a smart contract call on Somnia. When triggered, each step
+          executes and the result is written back on-chain permanently.
         </div>
 
       </main>

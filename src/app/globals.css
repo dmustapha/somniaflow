@@ -13,13 +13,13 @@
   --bg:           #060c18;
   --surface:      #0a1220;
   --surface-2:    #0d1828;
-  --border:       #0e2030;
+  --border:       #162d42;
   --ok:           #4ade80;
   --ok-glow:      rgba(74,222,128,0.3);
   --cyan:         #22d3ee;
   --text-hi:      #e8f4f8;
   --text-mid:     #7fa8b8;
-  --text-lo:      #2a4455;
+  --text-lo:      #4d7a8f;
 }
 
 /* ─── Keyframes ───────────────────────────────────────────────────── */
@@ -129,6 +129,7 @@ body {
   color: var(--brand);
   letter-spacing: 0.08em;
   user-select: none;
+  border-radius: 3px;
 }
 
 .sf-live-dot {
@@ -150,6 +151,7 @@ body {
     rgba(255,255,255,0.028) 0px 1px 1px 0px inset,
     rgba(34,211,238,0.05) 0px 0px 28px 0px;
   overflow: hidden;
+  border-radius: 6px;
 }
 
 /* Liquid glass border via mask-composite */
@@ -182,6 +184,7 @@ body {
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
   white-space: nowrap;
   letter-spacing: 0.02em;
+  border-radius: 4px;
 }
 .sf-btn-primary:active:not(:disabled) {
   background: linear-gradient(135deg, rgba(34,211,238,0.22) 0%, rgba(34,211,238,0.12) 100%);
@@ -206,6 +209,7 @@ body {
   font-size: 13px; font-weight: 400;
   cursor: pointer;
   transition: color 0.2s, border-color 0.2s;
+  border-radius: 4px;
 }
 .sf-btn-ghost:active {
   color: var(--text-hi);
@@ -217,6 +221,13 @@ body {
   outline-offset: 3px;
 }
 
+/* Interactive glass cards */
+a .sf-glass,
+button .sf-glass,
+.sf-glass-interactive {
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
 @media (hover: hover) {
   .sf-btn-primary:hover:not(:disabled) {
     background: linear-gradient(135deg, rgba(34,211,238,0.20) 0%, rgba(34,211,238,0.10) 100%);
@@ -226,6 +237,17 @@ body {
   .sf-btn-ghost:hover {
     color: var(--text-hi);
     border-color: rgba(34,211,238,0.2);
+  }
+  a:hover .sf-glass,
+  button:hover .sf-glass,
+  .sf-glass-interactive:hover {
+    background: rgba(13,24,40,0.85);
+    box-shadow:
+      rgba(255,255,255,0.028) 0px 1px 1px 0px inset,
+      rgba(34,211,238,0.10) 0px 0px 32px 0px;
+  }
+  .sf-nav-link:hover {
+    color: var(--text-hi) !important;
   }
 }
 
@@ -284,12 +306,13 @@ body {
   max-height: 88px; overflow-y: auto;
   white-space: pre-wrap; word-break: break-all;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  border-radius: 4px;
 }
 
 /* ─── Step connector ──────────────────────────────────────────────── */
 
 .sf-connector {
-  width: 2px; height: 14px; margin-left: 15px;
+  width: 2px; height: 14px; margin-left: 33px;
   background: repeating-linear-gradient(
     to bottom,
     var(--border) 0, var(--border) 3px,
@@ -315,6 +338,7 @@ body {
   padding: 3px 9px; font-size: 11px; font-weight: 600;
   letter-spacing: 0.05em; text-transform: uppercase;
   border: 1px solid;
+  border-radius: 3px;
 }
 
 /* ─── Rail pulse ──────────────────────────────────────────────────── */
@@ -349,6 +373,49 @@ body {
     border-bottom: none !important;
     padding: 24px 20px 32px !important;
   }
+  /* Stat strip: 2x2 grid on mobile */
+  .sf-stat-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .sf-stat-grid > div:nth-child(2) {
+    border-right: none !important;
+  }
+  .sf-stat-grid > div:nth-child(3) {
+    border-top: 1px solid var(--border);
+  }
+  .sf-stat-grid > div:nth-child(4) {
+    border-top: 1px solid var(--border);
+    border-right: none !important;
+  }
+  /* Hero padding reduction */
+  .sf-hero-inner {
+    padding: 40px 20px !important;
+  }
+}
+
+/* Mobile nav hamburger */
+.sf-nav-hamburger {
+  display: none;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-lo); font-size: 20px;
+  padding: 4px 8px; font-family: var(--font-mono);
+}
+
+@media (max-width: 640px) {
+  .sf-nav-links {
+    display: none;
+    position: absolute; top: 49px; left: 0; right: 0;
+    background: rgba(6,12,24,0.95);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    padding: 12px 24px;
+    gap: 12px;
+    z-index: 49;
+  }
+  .sf-nav-links.open { display: flex; }
+  .sf-nav-hamburger  { display: block; }
+  .sf-nav-divider    { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

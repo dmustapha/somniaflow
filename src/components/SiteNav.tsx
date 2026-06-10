@@ -1,16 +1,19 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 interface SiteNavProps {
   right?: React.ReactNode;
 }
 
+const DEMO_ID = (process.env.NEXT_PUBLIC_DEMO_PIPELINE_IDS ?? "1").split(",")[0].trim();
+
 const NAV_LINKS = [
-  { href: "/",           label: "Home"      },
-  { href: "/pipeline/1", label: "Live Demo" },
-  { href: "/compose",    label: "Compose"   },
-  { href: "/proof",      label: "Proof"     },
+  { href: "/",                    label: "Home"      },
+  { href: `/pipeline/${DEMO_ID}`, label: "Live Demo" },
+  { href: "/compose",             label: "Compose"   },
+  { href: "/proof",               label: "Proof"     },
 ];
 
 function isComposePath(href: string, pathname: string) {
@@ -27,6 +30,7 @@ function isActive(href: string, pathname: string) {
 
 export function SiteNav({ right }: SiteNavProps) {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="sf-header">
@@ -38,12 +42,21 @@ export function SiteNav({ right }: SiteNavProps) {
         <Link href="/" style={{ textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center" }}>
           <img src="/logo-v3.svg" alt="SomniaFlow" height={32} style={{ display: "block" }} />
         </Link>
-        <span style={{ width: "1px", height: "14px", background: "var(--border)", flexShrink: 0 }} />
-        <nav style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+        <span className="sf-nav-divider" style={{ width: "1px", height: "14px", background: "var(--border)", flexShrink: 0 }} />
+        <button
+          className="sf-nav-hamburger"
+          onClick={() => setMenuOpen(prev => !prev)}
+          aria-label="Toggle navigation"
+        >
+          {menuOpen ? "\u00d7" : "\u2261"}
+        </button>
+        <nav className={`sf-nav-links ${menuOpen ? "open" : ""}`} style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           {NAV_LINKS.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
+              className="sf-nav-link"
+              onClick={() => setMenuOpen(false)}
               style={{
                 fontSize: "13px",
                 letterSpacing: "0.03em",
