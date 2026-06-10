@@ -19,8 +19,25 @@ export async function GET(
     const provider = new ethers.JsonRpcProvider(HTTP_RPC, new ethers.Network("somnia-shannon", 50312), { staticNetwork: new ethers.Network("somnia-shannon", 50312) });
     const contract = new Contract(REGISTRY_ADDRESS, ABI, provider);
 
-    const filter = contract.filters.StepCompleted(BigInt(params.id));
-    const logs   = await contract.queryFilter(filter, -100_000); // last ~100k blocks
+    const pipelineId = BigInt(params.id);
+    const filter = contract.filters.StepCompleted(pipelineId);
+
+    // Shannon RPC limits getLogs to 1000 blocks — paginate backwards
+    const latestBlock = await provider.getBlockNumber();
+    const allLogs: ethers.Log[] = [];
+    const CHUNK = 999;
+    const MAX_LOOKBACK = 50_000;
+    let toBlock = latestBlock;
+    const floor = Math.max(0, latestBlock - MAX_LOOKBACK);
+
+    while (toBlock > floor && allLogs.length < 100) {
+      const fromBlock = Math.max(floor, toBlock - CHUNK);
+      const chunk = await contract.queryFilter(filter, fromBlock, toBlock);
+      allLogs.push(...chunk);
+      toBlock = fromBlock - 1;
+    }
+
+    const logs = allLogs;
 
     // Sort ascending by block
     const sorted = [...logs].sort((a, b) => a.blockNumber - b.blockNumber);

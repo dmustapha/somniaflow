@@ -92,29 +92,53 @@ function computeRiskScore(input: RiskInput): {
 
 function extractFromPrev(body: RiskInput): RiskInput {
   // Try to extract typed fields from prevResult or sentiment strings
-  const raw = body.prevResult ?? body.sentiment ?? "";
-  if (!raw) return body;
+  const rawInput = body.prevResult ?? body.sentiment;
+  if (rawInput == null || rawInput === "") return body;
 
-  // Attempt JSON parse (relay passes structured result as JSON)
-  try {
-    const parsed = JSON.parse(raw);
+  // Coerce to string in case body parser delivered a non-string type
+  const raw = typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput);
+
+  // If rawInput was already an object (body parser auto-parsed inner JSON), use directly
+  if (typeof rawInput === "object" && rawInput !== null) {
+    const parsed = rawInput as Record<string, unknown>;
     return {
       ...body,
-      fear_greed: body.fear_greed ?? parsed.value ?? parsed.fear_greed,
-      price: body.price ?? parsed.price,
-      change_24h: body.change_24h ?? parsed.change_24h,
-      volume_change: body.volume_change ?? parsed.volume_change,
+      fear_greed: body.fear_greed ?? toNum(parsed.value) ?? toNum(parsed.fear_greed),
+      price: body.price ?? toNum(parsed.price),
+      change_24h: body.change_24h ?? toNum(parsed.change_24h),
+      volume_change: body.volume_change ?? toNum(parsed.volume_change),
     };
+  }
+
+  // Attempt JSON parse (relay passes structured result as JSON string)
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null) {
+      return {
+        ...body,
+        fear_greed: body.fear_greed ?? toNum(parsed.value) ?? toNum(parsed.fear_greed),
+        price: body.price ?? toNum(parsed.price),
+        change_24h: body.change_24h ?? toNum(parsed.change_24h),
+        volume_change: body.volume_change ?? toNum(parsed.volume_change),
+      };
+    }
   } catch { /* not JSON, try regex */ }
 
   // Regex fallback: extract number from text like "Fear & Greed Index: 9 (Extreme Fear)"
   if (body.fear_greed == null) {
     const fgMatch = raw.match(/(?:index|f&g|fear.*greed)[:\s]+(\d+)/i)
+      ?? raw.match(/value[:\s"]+(\d+)/i)
       ?? raw.match(/^(\d{1,3})$/);
     if (fgMatch) return { ...body, fear_greed: parseInt(fgMatch[1], 10) };
   }
 
   return body;
+}
+
+function toNum(v: unknown): number | undefined {
+  if (typeof v === "number" && !isNaN(v)) return v;
+  if (typeof v === "string") { const n = parseFloat(v); if (!isNaN(n)) return n; }
+  return undefined;
 }
 
 export async function POST(req: NextRequest) {

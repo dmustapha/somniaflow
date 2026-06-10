@@ -104,9 +104,13 @@ export async function POST(req: NextRequest) {
   try {
     const body: PriceInput = await req.json().catch(() => ({}));
 
-    // If prevResult is a valid ticker, use it
-    let symbols = body.symbols ?? (body.symbol ? [body.symbol] : ["btc"]);
-    if (!body.symbol && !body.symbols && body.prevResult) {
+    // Normalize symbol inputs to string arrays
+    const rawSymbol = typeof body.symbol === "string" ? body.symbol : undefined;
+    const rawSymbols = Array.isArray(body.symbols)
+      ? body.symbols.filter((s): s is string => typeof s === "string")
+      : undefined;
+    let symbols = rawSymbols ?? (rawSymbol ? [rawSymbol] : ["btc"]);
+    if (!rawSymbol && !rawSymbols && body.prevResult) {
       const prev = body.prevResult.trim().toLowerCase();
       if (CG_MAP[prev]) symbols = [prev];
     }

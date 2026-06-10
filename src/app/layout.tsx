@@ -11,7 +11,7 @@ const mono = IBM_Plex_Mono({
 
 const sans = DM_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["300", "400", "500", "600", "700"],
   variable: "--font-sans",
   display: "swap",
 });

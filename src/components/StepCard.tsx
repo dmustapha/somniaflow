@@ -77,7 +77,7 @@ export function StepCard({
   const defaultSublabel = agentType === 1 ? "AI model" : "API call";
   const displayLabel   = label   ?? defaultLabel;
   const displaySublabel = sublabel ?? defaultSublabel;
-  const defaultPendingCopy = "awaiting Somnia validator network...";
+  const defaultPendingCopy = "Processing on the blockchain...";
 
   const showFooter =
     (durationMs !== undefined && durationMs > 0) ||
@@ -112,12 +112,12 @@ export function StepCard({
     : "transparent";
 
   const badgeLabel = decisionBadge
-    ? decision.decision
-    : status === "idle"      ? "IDLE"
-    : status === "pending"   ? "PENDING"
+    ? (decision.decision === "EXECUTE" ? "PROCEED" : "SKIP")
+    : status === "idle"      ? "WAITING"
+    : status === "pending"   ? "RUNNING"
     : status === "complete"  ? "DONE"
     : status === "failed"    ? "FAILED"
-    : status === "retrying"  ? "RETRY"
+    : status === "retrying"  ? "RETRYING"
     : "SKIPPED";
 
   // Format the result for display
@@ -205,7 +205,7 @@ export function StepCard({
               fontSize: "11px", fontFamily: "var(--font-mono)",
               color: "#fbbf24", marginTop: "4px",
             }}>
-              ↻ retrying after timeout
+              ↻ Trying again...
             </div>
           )}
 
@@ -214,12 +214,15 @@ export function StepCard({
             <WordReveal text={streamingText} />
           )}
 
-          {/* Decision card — structured display for LLM or external agents that produce DECISION format */}
-          {decision && status === "complete" && (agentType === 1 || agentType === 3) && (
+          {/* Decision card — structured display for any step that produces a DECISION */}
+          {decision && status === "complete" && (
             <div style={{
               marginTop: "12px", padding: "14px 16px",
               border: `1px solid ${decision.decision === "EXECUTE" ? "rgba(74,222,128,0.25)" : "var(--border)"}`,
               background: decision.decision === "EXECUTE" ? "rgba(74,222,128,0.04)" : "rgba(255,255,255,0.01)",
+              borderRadius: "10px",
+              boxShadow: "rgba(0,0,0,0.2) 0px 2px 8px 0px inset",
+              animation: "sf-fade-up 0.3s ease-out both",
             }}>
               {/* Decision + swap + confidence row */}
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
@@ -228,22 +231,23 @@ export function StepCard({
                   color: decision.decision === "EXECUTE" ? "var(--ok)" : "var(--text-lo)",
                   fontFamily: "var(--font-sans)",
                 }}>
-                  {decision.decision}
+                  {decision.decision === "EXECUTE" ? "Proceed" : "Skip"}
                 </span>
                 {decision.swapPct > 0 && (
                   <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-lo)" }}>
-                    {decision.swapPct}% allocation
+                    Suggested allocation: {decision.swapPct}%
                   </span>
                 )}
                 <span style={{
                   marginLeft: "auto", fontSize: "10px",
                   fontFamily: "var(--font-mono)", color: "var(--text-lo)",
                   padding: "2px 6px", border: "1px solid var(--border)",
+                  borderRadius: "4px",
                 }}>
                   {decision.confidence}
                 </span>
               </div>
-              {/* LLM reasoning */}
+              {/* AI reasoning */}
               <p style={{
                 fontSize: "12px", lineHeight: 1.65,
                 color: "var(--text-mid)", margin: 0,
@@ -270,7 +274,7 @@ export function StepCard({
               marginTop: "6px", fontSize: "11px", fontFamily: "var(--font-mono)",
               color: "var(--text-lo)",
             }}>
-              skipped — the smart contract decided not to run this step
+              Skipped — the workflow decided this step wasn't needed
             </div>
           )}
 
@@ -278,9 +282,10 @@ export function StepCard({
           {showFooter && (
             <div style={{
               display: "flex", alignItems: "center", gap: "12px",
-              marginTop: "12px", paddingTop: "10px",
-              borderTop: "1px solid rgba(255,255,255,0.04)",
+              marginTop: "12px", paddingTop: "12px",
+              borderTop: "1px solid var(--border-subtle, rgba(255,255,255,0.04))",
               flexWrap: "wrap",
+              animation: "sf-fade-in 0.3s ease-out 0.15s both",
             }}>
               {durationMs !== undefined && durationMs > 0 && (
                 <span style={{
@@ -295,7 +300,7 @@ export function StepCard({
                   fontSize: "10px", fontFamily: "var(--font-mono)",
                   color: "var(--text-lo)",
                 }}>
-                  {sttCost} STT
+                  {sttCost} STT (fee)
                 </span>
               )}
               {(txHash || requestId) && (
@@ -307,10 +312,12 @@ export function StepCard({
                     fontSize: "10px", fontFamily: "var(--font-mono)",
                     color: "var(--brand)", opacity: 0.8,
                     textDecoration: "none", marginLeft: "auto",
-                    transition: "opacity 0.15s",
+                    transition: "opacity 0.15s, transform 0.15s",
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateX(2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = "0.8"; e.currentTarget.style.transform = "translateX(0)"; }}
                 >
-                  ↗ tx {(txHash ?? requestId ?? "").slice(0, 8)}…
+                  ↗ view on blockchain
                 </a>
               )}
             </div>

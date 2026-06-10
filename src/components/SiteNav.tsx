@@ -40,7 +40,10 @@ export function SiteNav({ right }: SiteNavProps) {
         display: "flex", alignItems: "center", gap: "12px",
       }}>
         <Link href="/" style={{ textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center" }}>
-          <img src="/logo-v3.svg" alt="SomniaFlow" height={32} style={{ display: "block" }} />
+          <img src="/logo-v3.svg" alt="SomniaFlow" height={32} style={{ display: "block", transition: "opacity 0.2s" }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = "0.7"; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+          />
         </Link>
         <span className="sf-nav-divider" style={{ width: "1px", height: "14px", background: "var(--border)", flexShrink: 0 }} />
         <button
@@ -55,7 +58,7 @@ export function SiteNav({ right }: SiteNavProps) {
             <Link
               key={href}
               href={href}
-              className="sf-nav-link"
+              className={`sf-nav-link${isActive(href, pathname) ? " active" : ""}`}
               onClick={() => setMenuOpen(false)}
               style={{
                 fontSize: "13px",

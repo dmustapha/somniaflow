@@ -23,13 +23,13 @@ export function LiveBlock() {
 
   if (!block) {
     return (
-      <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-lo)", opacity: 0.4 }}>
+      <span className="sf-shimmer" style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-lo)", opacity: 0.6 }}>
         connecting...
       </span>
     );
   }
   return (
-    <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--ok)" }}>
+    <span key={block} className="sf-fade-in" style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--ok)" }}>
       block {block.toLocaleString()}
     </span>
   );

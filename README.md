@@ -6,12 +6,12 @@
 [![Tests](https://img.shields.io/badge/tests-47_passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-The first on-chain multi-agent orchestration protocol on Somnia. Register a pipeline once, trigger it once, and watch three agents coordinate autonomously. Every step is recorded on Shannon testnet through an on-chain FSM.
+The first on-chain multi-agent orchestration protocol on Somnia. Register a pipeline once, trigger it once, and watch four agents coordinate autonomously. Every step is recorded on Shannon testnet through an on-chain FSM.
 
 ![SomniaFlow home page](docs/images/landing.png)
 
 **Live demo:** [somniaflow.vercel.app](https://somniaflow.vercel.app)
-**Contract:** [`0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc`](https://shannon-explorer.somnia.network/address/0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc) on Shannon testnet
+**Contract:** [`0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1`](https://shannon-explorer.somnia.network/address/0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1) on Shannon testnet
 
 ---
 
@@ -21,10 +21,11 @@ Today, every multi-agent workflow on Somnia requires an off-chain coordinator. T
 
 The core is `PipelineRegistry.sol` — an on-chain FSM that stores pipeline definitions (ordered steps, agent assignments, balances) and emits `StepCompleted` events as each agent finishes. An off-chain relay coordinator listens to these events and dispatches the next step, giving you verifiable multi-agent coordination with every handoff recorded on-chain.
 
-**Demo pipeline:**
-1. **Data Fetcher** — fetches live data from a JSON API
-2. **AI Analyst** — evaluates the data and decides: execute or skip the next step
-3. **Conditional Actor** — runs only if the AI Analyst says execute; skipped otherwise
+**Demo pipeline (4 agents):**
+1. **Crypto Price** — fetches live BTC price from CoinGecko, Binance, and CoinPaprika (multi-source average)
+2. **Fear & Greed** — fetches the market sentiment index from alternative.me
+3. **Risk Evaluator** — algorithmic risk scorer (4-component: sentiment, price stability, timing, volatility). Outputs EXECUTE or SKIP
+4. **Market Data** — fetches top movers by market cap. Conditional: only runs if the Risk Evaluator says EXECUTE
 
 Every decision, step result, and branch path is stored as a transaction on Shannon testnet.
 
@@ -50,7 +51,7 @@ Every decision, step result, and branch path is stored as a transaction on Shann
 
 Or query directly:
 ```bash
-cast call 0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc \
+cast call 0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1 \
   "getPipeline(uint256)(address,bool,uint8,uint256)" 1 \
   --rpc-url https://dream-rpc.somnia.network
 ```
@@ -119,8 +120,8 @@ Fill in `.env.local`:
 ```env
 DEPLOYER_PRIVATE_KEY=0x_your_private_key_here
 DEPLOYER_ADDRESS=0x_your_address_here
-NEXT_PUBLIC_REGISTRY_ADDRESS=0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc
-NEXT_PUBLIC_DEMO_PIPELINE_IDS=2,3
+NEXT_PUBLIC_REGISTRY_ADDRESS=0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1
+NEXT_PUBLIC_DEMO_PIPELINE_IDS=1,2
 ANTHROPIC_API_KEY=sk-ant-your_key_here          # Required for AI Inference steps
 API_KEY=                                         # Optional: set to lock mutating routes
 ```
@@ -154,12 +155,16 @@ forge test -v
 ## Contract Interface
 
 ```solidity
-// Register a new pipeline
-function registerPipeline(
-    address[] calldata agents,
-    bytes32[] calldata stepData,
-    string[] calldata names
-) external returns (uint256 pipelineId);
+struct PipelineStepInput {
+    uint8 agentType;        // 0=JSON_API, 1=LLM_INFERENCE, 2=LLM_PARSE_WEBSITE, 3=EXTERNAL
+    string inputTemplate;   // Template with {prevResult} placeholder
+    bool conditionalOnPrev; // If true, step may be skipped based on prior output
+    uint8 maxRetries;
+}
+
+// Register a new pipeline (returns pipeline ID)
+function registerPipeline(PipelineStepInput[] calldata steps)
+    external payable returns (uint256 pipelineId);
 
 // Fund a pipeline (STT for agent calls)
 function fundPipeline(uint256 pipelineId) external payable;
@@ -167,8 +172,9 @@ function fundPipeline(uint256 pipelineId) external payable;
 // Trigger execution (starts step 0)
 function triggerPipeline(uint256 pipelineId) external;
 
-// Advance to next step (called by relay after StepCompleted event)
-function dispatchNext(uint256 pipelineId) external;
+// Called by relay after each StepCompleted event
+function ownerHandleResponse(uint256 pipelineId, uint256 stepIndex, string calldata result)
+    external;
 ```
 
 ---
@@ -177,7 +183,7 @@ function dispatchNext(uint256 pipelineId) external;
 
 | Network | Address | Explorer |
 |---|---|---|
-| Shannon testnet | `0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc` | [View](https://shannon-explorer.somnia.network/address/0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc) |
+| Shannon testnet | `0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1` | [View](https://shannon-explorer.somnia.network/address/0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1) |
 
 **Shannon testnet:** Chain ID 50312 | RPC `https://dream-rpc.somnia.network` | Explorer `shannon-explorer.somnia.network`
 

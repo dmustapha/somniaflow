@@ -3,9 +3,15 @@ import { getPipelineState, getStepDefinitions } from "@/lib/pipeline-service";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    // Validate pipeline ID is a non-negative integer
+    const id = params.id;
+    if (!/^\d+$/.test(id)) {
+      return NextResponse.json({ error: "pipelineId must be a non-negative integer" }, { status: 400 });
+    }
+
     const [state, steps] = await Promise.all([
-      getPipelineState(params.id),
-      getStepDefinitions(params.id).catch(() => []),
+      getPipelineState(id),
+      getStepDefinitions(id).catch(() => []),
     ]);
     return NextResponse.json({ ...state, steps });
   } catch (err: unknown) {

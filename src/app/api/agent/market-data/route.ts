@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
   try {
     const body: MarketInput = await req.json().catch(() => ({}));
     const category = body.category ?? "top_movers";
-    const limit = Math.min(body.limit ?? 5, 20);
+    const rawLimit = typeof body.limit === "number" ? body.limit : 5;
+    const limit = Math.min(Math.max(Math.floor(rawLimit), 1), 20);
 
     if (category === "global") {
       const res = await fetch(`${COINGECKO_API}/global`, { signal: AbortSignal.timeout(10_000) });

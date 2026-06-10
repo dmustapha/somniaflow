@@ -10,68 +10,143 @@ import type { PipelineSSEEvent, PipelineStepStatus, PipelineDecision, PipelineSt
 
 const EXPLORER = "https://shannon-explorer.somnia.network";
 
-const AGENT_LABELS: Record<number, { name: string; sublabel: string }> = {
-  0: { name: "JSON API",         sublabel: "External data fetch" },
-  1: { name: "AI Inference",     sublabel: "LLM reasoning" },
-  2: { name: "Web Parse",        sublabel: "Web scrape + AI" },
-  3: { name: "External Agent",   sublabel: "HTTP agent call" },
+// ── Step context: human-readable names, descriptions, and formatters ──
+// Maps agent endpoint patterns → what this step does in plain English.
+
+interface StepContext {
+  label:    string;
+  sublabel: string;
+  format:   (raw: string) => string;
+}
+
+const STEP_PATTERNS: Array<{
+  match: (def: PipelineStepDef) => boolean;
+  ctx:   StepContext;
+}> = [
+  {
+    match: d => d.inputTemplate.includes("/api/agent/crypto-price"),
+    ctx: {
+      label: "Live ETH Price",
+      sublabel: "Fetches the current ETH price from market data",
+      format: raw => {
+        try {
+          const p = JSON.parse(raw);
+          const dir = Number(p.change_24h) >= 0 ? "up" : "down";
+          return `${p.symbol ?? "ETH"} is at $${Number(p.price).toLocaleString()} (${dir} ${Math.abs(p.change_24h)}% today)`;
+        } catch { return raw; }
+      },
+    },
+  },
+  {
+    match: d => d.inputTemplate.includes("/api/agent/fear-greed"),
+    ctx: {
+      label: "Market Sentiment",
+      sublabel: "Reads the crypto market fear and greed index",
+      format: raw => {
+        try {
+          const p = JSON.parse(raw);
+          const mood = String(p.classification ?? "").toLowerCase();
+          const arrow = p.trend === "rising" ? "trending up" : p.trend === "falling" ? "trending down" : "holding steady";
+          return `Market mood: ${mood} (${p.value}/100), ${arrow}`;
+        } catch { return raw; }
+      },
+    },
+  },
+  {
+    match: d => d.inputTemplate.includes("/api/agent/risk-eval"),
+    ctx: {
+      label: "Risk Assessment",
+      sublabel: "Calculates whether conditions favor trading",
+      format: raw => raw, // decision card handles this
+    },
+  },
+  {
+    match: d => d.agentType === 1 && /market|price|risk|rebalanc|bullish|bearish|sentiment/i.test(d.inputTemplate),
+    ctx: {
+      label: "Final AI Decision",
+      sublabel: "AI reviews all the data and makes the final call",
+      format: raw => raw, // decision card handles this
+    },
+  },
+  {
+    match: d => d.inputTemplate.includes("ticker/price") || d.inputTemplate.includes("simple/price"),
+    ctx: {
+      label: "Live Price Check",
+      sublabel: "Gets the current price from a market API",
+      format: raw => { const n = Number(raw.trim()); return !isNaN(n) ? `Current price: $${n.toLocaleString()}` : raw; },
+    },
+  },
+  {
+    match: d => d.inputTemplate.includes("ticker/24hr"),
+    ctx: {
+      label: "Trading Volume",
+      sublabel: "Checks how much is being traded right now",
+      format: raw => { const n = Number(raw.trim()); return !isNaN(n) ? `24h trading volume: $${n.toLocaleString()}` : raw; },
+    },
+  },
+];
+
+// Fallback labels when no pattern matches
+const FALLBACK_LABELS: Record<number, { name: string; sublabel: string }> = {
+  0: { name: "Data Lookup",     sublabel: "Fetches live data from an API" },
+  1: { name: "AI Decision",     sublabel: "AI analyzes the data and decides" },
+  2: { name: "Web Reader",      sublabel: "Reads and extracts info from a webpage" },
+  3: { name: "External Agent",  sublabel: "Runs a specialized agent" },
 };
 
+function getStepContext(def: PipelineStepDef): StepContext | null {
+  for (const p of STEP_PATTERNS) {
+    if (p.match(def)) return p.ctx;
+  }
+  return null;
+}
+
 function stepLabel(def: PipelineStepDef): string {
-  // For EXTERNAL agents, extract name from /api/agent/{name} pattern
+  const ctx = getStepContext(def);
+  if (ctx) return ctx.label;
+  // Fallback: try to extract a name from external agent endpoint
   if (def.agentType === 3) {
     const match = def.inputTemplate.match(/\/api\/agent\/([^|"}\s]+)/);
-    if (match) {
-      return match[1]
-        .split('-')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-    }
+    if (match) return match[1].split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
-  const base = AGENT_LABELS[def.agentType]?.name ?? "Agent";
-  const urlMatch = def.inputTemplate.match(/^(https?:\/\/[^\s|]+)/);
-  if (urlMatch) {
-    try { return `${base}: ${new URL(urlMatch[1]).hostname}`; } catch { /* fall through */ }
-  }
-  return `Step ${def.index + 1}: ${base}`;
+  return FALLBACK_LABELS[def.agentType]?.name ?? `Step ${def.index + 1}`;
 }
 
 function stepSublabel(def: PipelineStepDef): string {
-  return AGENT_LABELS[def.agentType]?.sublabel ?? "";
+  return getStepContext(def)?.sublabel ?? FALLBACK_LABELS[def.agentType]?.sublabel ?? "";
 }
 
-/** Smart result formatter: detect type and format accordingly
- *  Handles: number, json-object, json-array, decision, error, url, text */
-function smartFormatResult(raw: string): string {
+function stepFormatter(def: PipelineStepDef): ((raw: string) => string) {
+  const ctx = getStepContext(def);
+  return ctx?.format ?? defaultFormat;
+}
+
+/** Step-specific loading messages */
+function pendingCopyFor(def: PipelineStepDef): string {
+  if (def.inputTemplate.includes("/api/agent/crypto-price")) return "Checking ETH price...";
+  if (def.inputTemplate.includes("/api/agent/fear-greed"))   return "Reading market sentiment...";
+  if (def.inputTemplate.includes("/api/agent/risk-eval"))    return "Calculating risk level...";
+  if (def.agentType === 1)                                    return "AI reviewing the data...";
+  return "Fetching data...";
+}
+
+/** Default formatter for results that don't match any step pattern */
+function defaultFormat(raw: string): string {
   if (!raw) return raw;
   const trimmed = raw.trim();
 
-  // Error result
-  if (trimmed.startsWith("ERROR:") || trimmed.startsWith("error:")) {
-    return trimmed;
-  }
+  if (trimmed.startsWith("ERROR:") || trimmed.startsWith("error:")) return trimmed;
+  if (trimmed.includes("DECISION:")) return trimmed; // decision card handles this
+  if (/^https?:\/\/\S+$/.test(trimmed)) return trimmed;
 
-  // Decision result (handled separately by WordReveal, but format nicely if shown raw)
-  if (trimmed.includes("DECISION:")) {
-    return trimmed;
-  }
-
-  // URL result
-  if (/^https?:\/\/\S+$/.test(trimmed)) {
-    return trimmed;
-  }
-
-  // Pure number — format with commas
   const num = Number(trimmed);
   if (!isNaN(num) && trimmed !== "") {
     return num >= 1000 ? `$${num.toLocaleString()}` : String(num);
   }
 
-  // Try JSON
   try {
     const parsed = JSON.parse(trimmed);
     if (Array.isArray(parsed)) {
-      // JSON array — show count + first items
       const preview = parsed.slice(0, 3).map((item: unknown) =>
         typeof item === "object" && item !== null
           ? Object.entries(item as Record<string, unknown>).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(", ")
@@ -81,20 +156,19 @@ function smartFormatResult(raw: string): string {
     }
     if (typeof parsed === "object" && parsed !== null) {
       const keys = Object.keys(parsed);
-      // Compact key:value for small objects
       if (keys.length <= 5) {
         return keys.map(k => {
           const v = (parsed as Record<string, unknown>)[k];
-          if (typeof v === "number") return `${k}: ${v >= 1000 ? v.toLocaleString() : v}`;
-          if (typeof v === "string" && v.length > 40) return `${k}: ${v.substring(0, 40)}...`;
-          return `${k}: ${v}`;
+          const label = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          if (typeof v === "number") return `${label}: ${v >= 1000 ? v.toLocaleString() : v}`;
+          if (typeof v === "string" && v.length > 40) return `${label}: ${v.substring(0, 40)}...`;
+          return `${label}: ${v}`;
         }).join(" · ");
       }
       return JSON.stringify(parsed, null, 2).substring(0, 400);
     }
   } catch { /* not JSON */ }
 
-  // Default: truncate long strings
   return raw.length > 200 ? raw.substring(0, 200) + "..." : raw;
 }
 
@@ -130,7 +204,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
     ? stepDefs.map(d => stepLabel(d)).join(" → ")
     : `Pipeline #${params.id}`;
   const pipelineTagline = stepDefs.length > 0
-    ? `${stepCount} agents · on-chain orchestration`
+    ? `${stepCount}-step workflow · every result saved to the blockchain`
     : `${stepCount} steps`;
 
   const sseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,7 +231,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
       if (esRef.current === es) {
         es.close();
         setPipeStatus("failed");
-        setError("Pipeline timed out after 90 seconds. Check STT balance and try again.");
+        setError("Timed out after 90 seconds. Please try again.");
       }
     }, 90_000);
   }
@@ -182,13 +256,16 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
         break;
       }
 
-      case "step_complete":
+      case "step_complete": {
+        const rawResult = event.data.result;
+        const hasDecision = rawResult?.includes("DECISION:");
         setSteps(prev => {
           const n = [...prev];
           n[event.data.step] = {
             ...n[event.data.step],
             status:     "complete",
-            result:     event.data.result,
+            result:     rawResult,
+            decision:   hasDecision ? parsePipelineDecision(rawResult) : n[event.data.step].decision,
             durationMs: event.data.durationMs,
             sttCost:    event.data.sttCost,
             txHash:     event.data.txHash,
@@ -196,6 +273,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
           return n;
         });
         break;
+      }
 
       case "decision": {
         // Attach decision to the step that produced it
@@ -348,8 +426,8 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
   const isSkipBranch = steps.some(s => s.status === "skipped");
   const decision     = steps.find(s => s.decision)?.decision;
 
-  const eyebrow = pipeStatus === "idle"     ? "Live run — ready to start"
-                : pipeStatus === "running"  ? "Agents running now"
+  const eyebrow = pipeStatus === "idle"     ? "Ready to start"
+                : pipeStatus === "running"  ? "Workflow running now"
                 : pipeStatus === "complete" ? "Run complete"
                 : "Run failed";
 
@@ -419,7 +497,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <div className="sf-live-dot" />
                 <span style={{ fontSize: "12px", fontFamily: "var(--font-mono)", color: "var(--ok)" }}>
-                  agents running...
+                  workflow running...
                 </span>
               </div>
             )}
@@ -446,7 +524,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               fontSize: "13px", color: "var(--text-lo)", marginBottom: "28px",
               fontFamily: "var(--font-sans)", lineHeight: 1.6, maxWidth: "460px",
             }}>
-              Trigger the pipeline on-chain or run a demo to watch the agents execute step by step in real time.
+              Run a demo to watch each AI step execute in real time, or trigger a live run on the blockchain.
             </p>
           )}
 
@@ -467,14 +545,14 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                     sttCost={step.sttCost}
                     requestId={step.requestId}
                     txHash={step.txHash}
-                    label={def ? stepLabel(def) : (AGENT_LABELS[step.sseAgentType ?? 0]?.name ?? `Step ${i + 1}`)}
-                    sublabel={def ? stepSublabel(def) : (AGENT_LABELS[step.sseAgentType ?? 0]?.sublabel ?? undefined)}
-                    conditional={def?.conditionalOnPrev ? "Only runs if previous step decided EXECUTE" : undefined}
-                    formatResult={smartFormatResult}
+                    label={def ? stepLabel(def) : (FALLBACK_LABELS[step.sseAgentType ?? 0]?.name ?? `Step ${i + 1}`)}
+                    sublabel={def ? stepSublabel(def) : (FALLBACK_LABELS[step.sseAgentType ?? 0]?.sublabel ?? undefined)}
+                    conditional={def?.conditionalOnPrev ? "Only runs if the previous step says go ahead" : undefined}
+                    formatResult={def ? stepFormatter(def) : defaultFormat}
                     pendingCopy={
-                      (def?.agentType ?? step.sseAgentType) === 1 ? "AI analyzing data..."
-                      : (def?.agentType ?? step.sseAgentType) === 3 ? "Calling external agent..."
-                      : "Fetching data..."
+                      def ? pendingCopyFor(def)
+                      : (step.sseAgentType === 1 ? "AI analyzing data..."
+                      : "Fetching data...")
                     }
                   />
                   {i < steps.length - 1 && <div className="sf-connector" />}
@@ -501,7 +579,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               color: "var(--text-hi)", marginBottom: "12px",
               fontFamily: "var(--font-sans)",
             }}>
-              How this pipeline works
+              How this workflow runs
             </div>
             <p style={{
               fontSize: "12px", color: "var(--text-mid)",
@@ -509,18 +587,33 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               fontFamily: "var(--font-sans)",
             }}>
               {stepDefs.length > 0
-                ? `${stepCount} agents run in sequence. Each step's output feeds into the next. The smart contract records every result on-chain.`
-                : "Multi-agent pipeline running on Somnia blockchain."}
+                ? "Each step gathers data or makes a decision, then passes the result to the next step. The AI at the end reviews everything and decides whether to act."
+                : "Multi-step AI workflow running on the Somnia blockchain."}
             </p>
+            {stepDefs.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "10px" }}>
+                {stepDefs.map((def, i) => (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: "8px",
+                    fontSize: "11px", fontFamily: "var(--font-sans)", color: "var(--text-mid)",
+                  }}>
+                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--text-lo)", minWidth: "14px" }}>{i + 1}.</span>
+                    <span style={{ fontWeight: 600, color: "var(--text-hi)" }}>{stepLabel(def)}</span>
+                    <span style={{ color: "var(--text-lo)" }}>{stepSublabel(def)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{
               padding: "10px 12px", marginBottom: "8px",
               border: "1px solid rgba(74,222,128,0.2)",
               background: "rgba(74,222,128,0.03)",
               fontSize: "11px", color: "var(--text-mid)",
               fontFamily: "var(--font-sans)", lineHeight: 1.55,
+              borderRadius: "8px",
             }}>
-              <span style={{ color: "var(--ok)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>EXECUTE</span>
-              {" "}— all steps run and results are recorded on the blockchain.
+              <span style={{ color: "var(--ok)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>PROCEED</span>
+              {" "}— The AI says conditions look good. All steps run and every result is permanently saved on the blockchain.
             </div>
             <div style={{
               padding: "10px 12px",
@@ -528,9 +621,10 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               background: "rgba(255,255,255,0.01)",
               fontSize: "11px", color: "var(--text-mid)",
               fontFamily: "var(--font-sans)", lineHeight: 1.55,
+              borderRadius: "8px",
             }}>
               <span style={{ color: "var(--text-lo)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>SKIP</span>
-              {" "}— conditional steps are bypassed when the AI decides to wait.
+              {" "}— The AI says conditions are unfavorable. Some steps are skipped, and the skip decision is recorded on-chain as proof.
             </div>
           </div>
 
@@ -541,13 +635,13 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               color: "var(--text-hi)", marginBottom: "4px",
               fontFamily: "var(--font-sans)",
             }}>
-              Run Pipeline
+              Run Workflow
             </div>
             <div style={{
               fontSize: "11px", color: "var(--text-lo)",
               fontFamily: "var(--font-sans)", marginBottom: "14px", lineHeight: 1.5,
             }}>
-              Live run records results on Somnia. Demo mode simulates locally.
+              Live mode saves results to the blockchain. Demo mode runs a simulation.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button
@@ -571,26 +665,27 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                 fontFamily: "var(--font-mono)", textAlign: "center",
                 letterSpacing: "0.06em", marginTop: "4px",
               }}>
-                or trigger a real on-chain run
+                or run it for real on the blockchain
               </div>
               <button
                 onClick={handleTrigger}
                 disabled={isRunning}
                 className="sf-btn-ghost"
-                title="Triggers a real on-chain transaction — requires a funded pipeline wallet"
+                title="Runs on the real blockchain — results are permanently saved"
                 style={{ width: "100%", textAlign: "center", fontSize: "11px" }}
               >
-                Trigger pipeline on-chain
+                Run on blockchain (live)
               </button>
             </div>
 
             {error && (
-              <div style={{
+              <div className="sf-shake" style={{
                 marginTop: "12px", padding: "10px 12px",
                 border: "1px solid rgba(248,113,113,0.3)",
                 background: "rgba(248,113,113,0.05)",
                 fontSize: "11px", fontFamily: "var(--font-mono)",
                 color: "#f87171", lineHeight: 1.5,
+                borderRadius: "8px",
               }}>
                 ✕ {error}
               </div>
@@ -599,7 +694,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
 
           {/* Completion summary — what just happened */}
           {isComplete && (
-            <div className="sf-glass" style={{ padding: "20px" }}>
+            <div className="sf-glass sf-glass-raised sf-scale-in" style={{ padding: "20px" }}>
               <div style={{
                 display: "flex", alignItems: "center",
                 justifyContent: "space-between", marginBottom: "14px",
@@ -612,6 +707,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                   border: `1px solid ${isSimulated ? "var(--border)" : "rgba(74,222,128,0.3)"}`,
                   color: isSimulated ? "var(--text-lo)" : "var(--ok)",
                   fontFamily: "var(--font-mono)", fontWeight: 600,
+                  borderRadius: "20px",
                 }}>
                   {isSimulated ? "DEMO RUN" : "RECORDED"}
                 </span>
@@ -619,10 +715,10 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
 
               {decision && (
                 <div className="sf-dr">
-                  <span className="sf-dr-key">AI decision</span>
+                  <span className="sf-dr-key">AI verdict</span>
                   <span className={`sf-dr-val ${decision.decision === "EXECUTE" ? "ok" : ""}`}>
-                    {decision.decision}
-                    {decision.swapPct > 0 && ` · ${decision.swapPct}%`}
+                    {decision.decision === "EXECUTE" ? "Proceed with trade" : "Skip this time"}
+                    {decision.swapPct > 0 && ` · ${decision.swapPct}% allocation`}
                   </span>
                 </div>
               )}
@@ -630,8 +726,8 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                 <span className="sf-dr-key">Path taken</span>
                 <span className="sf-dr-val">
                   {isSkipBranch
-                    ? `Skip · ${steps.filter(s => s.status === "complete").length} steps ran`
-                    : `Execute · ${steps.filter(s => s.status === "complete").length} steps ran`}
+                    ? `Skip path · ${steps.filter(s => s.status === "complete").length} steps ran`
+                    : `Full run · ${steps.filter(s => s.status === "complete").length} steps ran`}
                 </span>
               </div>
               <div className="sf-dr">
@@ -646,7 +742,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                     marginBottom: "4px", fontFamily: "var(--font-mono)",
                   }}>
                     This is a demo run — no on-chain transactions.
-                    Use &ldquo;Trigger pipeline on-chain&rdquo; to record real blockchain data.
+                    Use &ldquo;Run on blockchain&rdquo; to save real results permanently.
                   </div>
                 </div>
               ) : txHashes.length > 0 && (
@@ -683,7 +779,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                     color: "var(--text-mid)", textDecoration: "none",
                   }}
                 >
-                  See all recorded decisions →
+                  View all recorded results →
                 </Link>
                 <a
                   href={`${EXPLORER}/address/${process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1"}`}

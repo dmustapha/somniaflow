@@ -43,7 +43,7 @@ export function isRelayStarted(): boolean {
 export async function startRelayCoordinator(): Promise<void> {
   if (_relayStarted) return;
 
-  const privateKey  = process.env.DEPLOYER_PRIVATE_KEY;
+  const privateKey  = process.env.DEPLOYER_PRIVATE_KEY?.trim();
   const claudeApiKey  = process.env.ANTHROPIC_API_KEY ?? "";
 
   if (!privateKey) {

@@ -35,7 +35,7 @@ export default async function ProofPage() {
           textTransform: "uppercase", color: "var(--brand)",
           marginBottom: "14px", fontFamily: "var(--font-sans)",
         }}>
-          On-chain proof
+          Blockchain Proof
         </div>
 
         <h1 style={{
@@ -52,8 +52,8 @@ export default async function ProofPage() {
           fontSize: "14px", lineHeight: 1.7, color: "var(--text-mid)",
           maxWidth: "580px", marginBottom: "40px", fontFamily: "var(--font-sans)",
         }}>
-          There&apos;s no server deciding what happens — the rules are written into a smart contract
-          that anyone can read. Click any transaction record below to verify it yourself on the blockchain.
+          There&apos;s no company server deciding what happens. The rules are written into
+          the blockchain for anyone to see. Click any record below to verify it yourself.
         </p>
 
         {/* Pipeline state sections — TX hashes lead */}
@@ -102,6 +102,7 @@ export default async function ProofPage() {
                     fontWeight: 600, padding: "2px 7px",
                     border: `1px solid ${state.status === "Complete" ? "rgba(74,222,128,0.3)" : "var(--border)"}`,
                     color: state.status === "Complete" ? "var(--ok)" : "var(--text-lo)",
+                    borderRadius: "20px",
                   }}>
                     {state.status.toUpperCase()}
                   </span>
@@ -150,7 +151,10 @@ export default async function ProofPage() {
                                 style={{
                                   fontSize: "11px", fontFamily: "var(--font-mono)",
                                   color: "var(--brand)", textDecoration: "none", opacity: 0.8,
+                                  transition: "opacity 0.15s, transform 0.15s",
                                 }}
+                                onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateX(2px)"; }}
+                                onMouseLeave={e => { e.currentTarget.style.opacity = "0.8"; e.currentTarget.style.transform = "translateX(0)"; }}
                               >
                                 {cleanHash.slice(0, 14)}…{cleanHash.slice(-6)} ↗
                               </a>
@@ -174,7 +178,7 @@ export default async function ProofPage() {
                   >
                     Run the demo →
                   </Link>
-                  {" "}to generate the first on-chain record.
+                  {" "}to create the first blockchain record.
                 </div>
               )}
 
@@ -185,7 +189,7 @@ export default async function ProofPage() {
                     fontSize: "11px", fontFamily: "var(--font-mono)",
                     color: "var(--text-lo)", marginBottom: "12px", letterSpacing: "0.08em",
                   }}>
-                    LAST RUN RESULTS
+                    LATEST RESULTS
                   </div>
 
                   {state.stepResults?.map((result, i) => {
@@ -205,9 +209,9 @@ export default async function ProofPage() {
                     if (stepDecision) return (
                       <div key={i}>
                         <div className="sf-dr">
-                          <span className="sf-dr-key">Step {i + 1} — AI decision</span>
+                          <span className="sf-dr-key">Step {i + 1} — AI verdict</span>
                           <span className={`sf-dr-val ${stepDecision.decision === "EXECUTE" ? "ok" : ""}`}>
-                            {stepDecision.decision}
+                            {stepDecision.decision === "EXECUTE" ? "Proceed" : "Skip"}
                             {stepDecision.swapPct > 0 && ` · ${stepDecision.swapPct}%`}
                           </span>
                         </div>
@@ -255,7 +259,7 @@ export default async function ProofPage() {
                   fontSize: "12px", color: "var(--text-lo)",
                   fontFamily: "var(--font-sans)",
                 }}>
-                  Pipeline status: {state.status} · STT balance: {state.sttBalance}
+                  Status: {state.status} · Balance: {state.sttBalance} STT (test tokens)
                 </div>
               )}
             </div>
@@ -269,7 +273,7 @@ export default async function ProofPage() {
             color: "var(--text-hi)", marginBottom: "14px",
             fontFamily: "var(--font-sans)",
           }}>
-            Smart Contract
+            Blockchain Details
           </div>
 
           <div className="sf-dr">
@@ -316,9 +320,9 @@ export default async function ProofPage() {
             fontSize: "12px", color: "var(--text-mid)", lineHeight: 1.6,
             margin: 0, fontFamily: "var(--font-sans)",
           }}>
-            Click any transaction hash above to see it on the Somnia blockchain explorer. When the AI
-            decides EXECUTE, all steps run and are recorded. When it decides SKIP, the contract
-            blocks the conditional step automatically, so you see fewer records.
+            Click any record above to see it on the Somnia blockchain explorer. When the AI
+            decides to proceed, all steps run and are saved. When it decides to skip, the
+            blockchain blocks that step automatically, so you see fewer records.
           </p>
         </div>
 

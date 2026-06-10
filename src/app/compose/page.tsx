@@ -11,25 +11,26 @@ import type { SomniaAgent } from "@/lib/agent-registry";
 const TYPE_CONFIG: Record<number, { placeholder: string; hint: string }> = {
   0: {
     placeholder: "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT|price|0",
-    hint: "Format: url|jsonPath|decimals — e.g. https://api.example.com/price|data.price|2",
+    hint: "Paste a public API URL. Format: url|field_to_extract|decimal_places",
   },
   1: {
     placeholder: "Analyze this price data and decide whether to rebalance: {prevResult}",
-    hint: "Use {prevResult} to reference the previous step's output",
+    hint: "Write instructions for the AI. Use {prevResult} to include the previous step's output.",
   },
   2: {
     placeholder: "https://example.com|Extract the main headline and key metrics|0",
-    hint: "Format: url|extractionPrompt|0",
+    hint: "Enter a webpage URL and describe what to extract from it.",
   },
   3: {
-    placeholder: 'EXTERNAL|/api/agent/crypto-price|{"symbol":"eth"}',
-    hint: 'Format: EXTERNAL|endpoint_url|json_body — use {prevResult.field} for typed data from previous steps',
+    placeholder: 'Auto-filled when you select an agent above',
+    hint: 'Pick an agent from the list, or type EXTERNAL|endpoint_url|{"param":"value"}',
   },
 };
 
 const EXAMPLES = [
   {
     name: "Market Intelligence",
+    description: "Checks ETH price, reads market sentiment, evaluates risk, then AI makes a final trade decision.",
     steps: [
       { agentType: 3 as const, inputTemplate: 'EXTERNAL|/api/agent/crypto-price|{"symbol":"eth"}', conditionalOnPrev: false, maxRetries: 2 },
       { agentType: 3 as const, inputTemplate: 'EXTERNAL|/api/agent/fear-greed|{}', conditionalOnPrev: false, maxRetries: 2 },
@@ -39,6 +40,7 @@ const EXAMPLES = [
   },
   {
     name: "ETH Price Rebalancing",
+    description: "Fetches ETH price, AI decides whether to rebalance, then checks trading volume if conditions are right.",
     steps: [
       { agentType: 0 as const, inputTemplate: "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT|price|0", conditionalOnPrev: false, maxRetries: 2 },
       { agentType: 1 as const, inputTemplate: "ETH price is {prevResult} USDT. Decide: EXECUTE rebalancing if price dropped >5% from typical level, SKIP if price is stable or rising.", conditionalOnPrev: false, maxRetries: 2 },
@@ -47,6 +49,7 @@ const EXAMPLES = [
   },
   {
     name: "BTC Sentiment Check",
+    description: "Gets Bitcoin price from CoinGecko, then AI analyzes whether conditions are bullish or bearish.",
     steps: [
       { agentType: 0 as const, inputTemplate: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd|bitcoin.usd|0", conditionalOnPrev: false, maxRetries: 2 },
       { agentType: 1 as const, inputTemplate: "Bitcoin price is {prevResult} USD. Analyze market conditions and decide: EXECUTE if bullish, SKIP if bearish or uncertain.", conditionalOnPrev: false, maxRetries: 2 },
@@ -99,6 +102,25 @@ export default function ComposePage() {
     setSteps(prev => prev.map(s => s._id === id ? { ...s, ...patch } : s));
   }
 
+  /** Build a sensible default template when the user picks an agent */
+  function selectAgent(stepId: number, agent: SomniaAgent) {
+    const step = steps.find(s => s._id === stepId);
+    const patch: Partial<StepDraft> = { agentType: agent.executionType, selectedAgentId: agent.id };
+    // Auto-fill template only if empty
+    if (!step?.inputTemplate.trim()) {
+      if (agent.manifest?.endpoint) {
+        // External agent — EXTERNAL|endpoint|{}
+        // Use relative path — strip origin if manifest has full URL
+        const ep = agent.manifest.endpoint.replace(/^https?:\/\/[^/]+/, "");
+        patch.inputTemplate = `EXTERNAL|${ep}|{}`;
+      } else {
+        // Platform type — use placeholder as starter
+        patch.inputTemplate = TYPE_CONFIG[agent.executionType]?.placeholder ?? "";
+      }
+    }
+    updateStep(stepId, patch);
+  }
+
   function loadExample(ex: typeof EXAMPLES[0]) {
     setSteps(ex.steps.map(s => ({ ...s, _id: ++idCounter })));
     setError(null);
@@ -109,7 +131,7 @@ export default function ComposePage() {
     setError(null);
     const invalid = steps.find(s => !s.inputTemplate.trim());
     if (invalid) {
-      setError(`Step ${steps.indexOf(invalid) + 1} needs an input template.`);
+      setError(`Step ${steps.indexOf(invalid) + 1} needs instructions. Select an agent or type what this step should do.`);
       return;
     }
 
@@ -151,7 +173,7 @@ export default function ComposePage() {
             textTransform: "uppercase", color: "var(--brand)",
             marginBottom: "14px", fontFamily: "var(--font-sans)",
           }}>
-            Pipeline Composer
+            Workflow Builder
           </div>
           <h1 style={{
             fontFamily: "var(--font-serif)",
@@ -160,15 +182,16 @@ export default function ComposePage() {
             lineHeight: 1.1, letterSpacing: "-0.01em",
             color: "var(--text-hi)", marginBottom: "10px",
           }}>
-            Build your own agent flow
+            Build your own AI workflow
           </h1>
           <p style={{
             fontSize: "14px", color: "var(--text-mid)",
-            lineHeight: 1.65, maxWidth: "520px",
+            lineHeight: 1.65, maxWidth: "560px",
             fontFamily: "var(--font-sans)",
           }}>
-            Chain data fetches, AI reasoning, and web scraping into a multi-step pipeline
-            that runs on-chain on the Somnia Shannon testnet.
+            Chain AI agents together into a workflow. Each agent does one job (check a price,
+            read sentiment, assess risk), then passes its output to the next. The final
+            agent reviews everything and makes a decision. Every step is recorded on-chain.
           </p>
         </div>
 
@@ -187,12 +210,21 @@ export default function ComposePage() {
                 key={ex.name}
                 onClick={() => loadExample(ex)}
                 className="sf-btn-ghost"
+                title={ex.description}
                 style={{ fontSize: "12px", padding: "6px 14px" }}
               >
                 {ex.name}
               </button>
             ))}
           </div>
+          {steps.length >= 2 && steps[0].inputTemplate && (
+            <div style={{
+              marginTop: "8px", fontSize: "11px", color: "var(--text-lo)",
+              fontFamily: "var(--font-sans)", fontStyle: "italic",
+            }}>
+              {EXAMPLES.find(ex => ex.steps[0]?.inputTemplate === steps[0].inputTemplate)?.description ?? ""}
+            </div>
+          )}
         </div>
 
         {/* Steps */}
@@ -221,7 +253,7 @@ export default function ComposePage() {
                         fontSize: "10px", fontFamily: "var(--font-mono)",
                         color: "var(--brand)",
                       }}>
-                        {selectedAgent?.name ?? ["JSON API", "AI Inference", "Web Parse", "External"][step.agentType]}
+                        {selectedAgent?.name ?? ["Data Lookup", "AI Analysis", "Web Reader", "Custom Agent"][step.agentType]}
                       </span>
                     </div>
                     {steps.length > 1 && (
@@ -250,16 +282,16 @@ export default function ComposePage() {
                         fontSize: "11px", color: "var(--text-lo)",
                         fontFamily: "var(--font-mono)",
                       }}>
-                        SELECT AGENT
+                        CHOOSE AN AI STEP
                       </div>
                       {agentsLoading && (
                         <span style={{ fontSize: "10px", color: "var(--text-lo)", fontFamily: "var(--font-mono)" }}>
-                          fetching from chain…
+                          loading available agents…
                         </span>
                       )}
                       {!agentsLoading && (
                         <span style={{ fontSize: "10px", color: "var(--text-lo)", fontFamily: "var(--font-mono)" }}>
-                          ◈ {agents.length} agents on Somnia
+                          ◈ {agents.length} agents available
                         </span>
                       )}
                     </div>
@@ -271,13 +303,13 @@ export default function ComposePage() {
                       return (
                         <div style={{ marginBottom: "8px" }}>
                           <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ok)", letterSpacing: "0.08em", marginBottom: "4px" }}>
-                            SOMNIAFLOW
+                            SOMNIAFLOW AGENTS — ready to use
                           </div>
                           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                             {sfAgents.map(a => (
                               <button
                                 key={a.id}
-                                onClick={() => updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id })}
+                                onClick={() => selectAgent(step._id, a)}
                                 title={a.description}
                                 style={{
                                   fontSize: "11px", fontFamily: "var(--font-mono)",
@@ -286,6 +318,7 @@ export default function ComposePage() {
                                   background: step.selectedAgentId === a.id ? "rgba(74,222,128,0.1)" : "transparent",
                                   color: step.selectedAgentId === a.id ? "var(--ok)" : "rgba(74,222,128,0.7)",
                                   transition: "all 0.15s",
+                                  borderRadius: "6px",
                                 }}
                               >
                                 {a.name}
@@ -303,13 +336,13 @@ export default function ComposePage() {
                       return (
                         <div style={{ marginBottom: "8px" }}>
                           <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--brand)", letterSpacing: "0.08em", marginBottom: "4px" }}>
-                            PLATFORM
+                            SOMNIA PLATFORM — bring your own data
                           </div>
                           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                             {plAgents.map(a => (
                               <button
                                 key={a.id}
-                                onClick={() => updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id })}
+                                onClick={() => selectAgent(step._id, a)}
                                 title={a.description}
                                 style={{
                                   fontSize: "11px", fontFamily: "var(--font-mono)",
@@ -318,6 +351,7 @@ export default function ComposePage() {
                                   background: step.selectedAgentId === a.id ? "var(--brand-dim)" : "transparent",
                                   color: step.selectedAgentId === a.id ? "var(--brand)" : "var(--text-lo)",
                                   transition: "all 0.15s",
+                                  borderRadius: "6px",
                                 }}
                               >
                                 {a.name}
@@ -359,15 +393,15 @@ export default function ComposePage() {
                           >
                             <span style={{ fontSize: "8px" }}>{communityOpen ? "▼" : "▶"}</span>
                             {communityOpen
-                              ? `COMMUNITY (${callable.length} callable)`
-                              : `+ ${totalOnChain} community agents on-chain`}
+                              ? `COMMUNITY (${callable.length} available)`
+                              : `+ ${totalOnChain} community-built agents`}
                           </button>
                           {communityOpen && (
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {callable.length > 0 ? callable.map(a => (
                                 <button
                                   key={a.id}
-                                  onClick={() => updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id })}
+                                  onClick={() => selectAgent(step._id, a)}
                                   title={a.description}
                                   style={{
                                     fontSize: "11px", fontFamily: "var(--font-mono)",
@@ -376,6 +410,7 @@ export default function ComposePage() {
                                     background: step.selectedAgentId === a.id ? "rgba(96,165,250,0.08)" : "transparent",
                                     color: "rgba(96,165,250,0.7)",
                                     transition: "all 0.15s",
+                                    borderRadius: "6px",
                                   }}
                                 >
                                   {a.name}
@@ -385,7 +420,7 @@ export default function ComposePage() {
                                   fontSize: "11px", fontFamily: "var(--font-mono)",
                                   color: "rgba(96,165,250,0.35)", padding: "5px 0",
                                 }}>
-                                  No callable community agents yet. {unique.length} registered (view-only).
+                                  No community agents available yet. {unique.length} registered but not callable.
                                 </span>
                               )}
                             </div>
@@ -394,15 +429,23 @@ export default function ComposePage() {
                       );
                     })()}
 
-                    {selectedAgent && (
+                    {selectedAgent ? (
+                      <div style={{
+                        fontSize: "11px", color: "var(--text-mid)",
+                        fontFamily: "var(--font-sans)", marginTop: "8px", lineHeight: 1.5,
+                        padding: "8px 10px", background: "rgba(74,222,128,0.04)",
+                        border: "1px solid rgba(74,222,128,0.15)", borderRadius: "6px",
+                      }}>
+                        <span style={{ fontWeight: 600, color: "var(--ok)" }}>{selectedAgent.name}</span>
+                        {" — "}{selectedAgent.description}
+                      </div>
+                    ) : (
                       <div style={{
                         fontSize: "11px", color: "var(--text-lo)",
                         fontFamily: "var(--font-sans)", marginTop: "6px", lineHeight: 1.5,
+                        fontStyle: "italic",
                       }}>
-                        {selectedAgent.description}
-                        <span style={{ color: "var(--brand)", marginLeft: "6px" }}>
-                          [{selectedAgent.typeLabel}]
-                        </span>
+                        Pick an agent to see what it does
                       </div>
                     )}
                   </div>
@@ -413,22 +456,25 @@ export default function ComposePage() {
                       fontSize: "11px", color: "var(--text-lo)",
                       fontFamily: "var(--font-mono)", marginBottom: "6px",
                     }}>
-                      INPUT TEMPLATE
+                      INSTRUCTIONS
                     </div>
                     <textarea
                       value={step.inputTemplate}
                       onChange={e => updateStep(step._id, { inputTemplate: e.target.value })}
                       placeholder={typeCfg.placeholder}
                       rows={3}
+                      onFocus={e => { e.currentTarget.style.borderColor = "rgba(34,211,238,0.5)"; e.currentTarget.style.boxShadow = "0 0 0 1px rgba(34,211,238,0.15)"; }}
+                      onBlur={e => { e.currentTarget.style.borderColor = "rgba(22,45,66,0.8)"; e.currentTarget.style.boxShadow = "none"; }}
                       style={{
                         width: "100%", boxSizing: "border-box",
                         background: "rgba(0,0,0,0.3)",
                         border: "1px solid rgba(22,45,66,0.8)",
-                        borderRadius: "4px",
+                        borderRadius: "8px",
                         color: "var(--text-hi)",
                         fontSize: "12px", fontFamily: "var(--font-mono)",
                         padding: "10px 12px", resize: "vertical",
                         outline: "none", lineHeight: 1.55,
+                        transition: "border-color 0.2s, box-shadow 0.2s",
                       }}
                     />
                     <div style={{
@@ -452,7 +498,7 @@ export default function ComposePage() {
                         onChange={e => updateStep(step._id, { conditionalOnPrev: e.target.checked })}
                         style={{ accentColor: "var(--brand)" }}
                       />
-                      Conditional: only run if previous step decided EXECUTE
+                      Optional: only run if the previous step says go ahead
                     </label>
                     <label style={{
                       display: "flex", alignItems: "center", gap: "6px",
@@ -469,6 +515,7 @@ export default function ComposePage() {
                           color: "var(--text-mid)",
                           fontSize: "11px", fontFamily: "var(--font-mono)",
                           padding: "2px 6px", cursor: "pointer",
+                          borderRadius: "6px",
                         }}
                       >
                         <option value={0}>0</option>
@@ -511,12 +558,13 @@ export default function ComposePage() {
 
         {/* Error */}
         {error && (
-          <div style={{
+          <div className="sf-shake" style={{
             padding: "12px 14px", marginBottom: "16px",
             border: "1px solid rgba(248,113,113,0.3)",
             background: "rgba(248,113,113,0.05)",
             fontSize: "12px", fontFamily: "var(--font-mono)",
             color: "#f87171",
+            borderRadius: "8px",
           }}>
             ✕ {error}
           </div>
@@ -524,14 +572,15 @@ export default function ComposePage() {
 
         {/* Success */}
         {pipelineId && (
-          <div style={{
+          <div className="sf-scale-in" style={{
             padding: "12px 14px", marginBottom: "16px",
             border: "1px solid rgba(74,222,128,0.3)",
             background: "rgba(74,222,128,0.05)",
             fontSize: "12px", fontFamily: "var(--font-mono)",
             color: "var(--ok)",
+            borderRadius: "8px",
           }}>
-            ✓ Pipeline #{pipelineId} registered on-chain. Redirecting…
+            ✓ Workflow #{pipelineId} created on the blockchain. Redirecting…
           </div>
         )}
 
@@ -543,26 +592,34 @@ export default function ComposePage() {
             className="sf-btn-primary"
             style={{ minWidth: "200px" }}
           >
-            {submitting ? "Registering on-chain…" : "Deploy pipeline"}
+            {submitting ? "Creating workflow…" : "Create workflow"}
           </button>
           <span style={{
             fontSize: "11px", color: "var(--text-lo)",
             fontFamily: "var(--font-mono)",
           }}>
-            Writes a tx to Somnia Shannon testnet
+            Saves your workflow to the blockchain
           </span>
         </div>
 
-        {/* Info */}
+        {/* How it works */}
         <div style={{
-          marginTop: "32px", padding: "14px 16px",
+          marginTop: "32px", padding: "16px 18px",
           border: "1px solid var(--border)",
           background: "rgba(255,255,255,0.01)",
+          borderRadius: "8px",
           fontSize: "12px", color: "var(--text-lo)",
           fontFamily: "var(--font-sans)", lineHeight: 1.6,
         }}>
-          Your pipeline registers as a smart contract call on Somnia. When triggered, each step
-          executes and the result is written back on-chain permanently.
+          <div style={{ fontWeight: 600, color: "var(--text-hi)", marginBottom: "8px", fontSize: "13px" }}>
+            What happens when you create a workflow
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div><span style={{ color: "var(--ok)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>1.</span> Your steps are saved to the Somnia blockchain as a permanent record.</div>
+            <div><span style={{ color: "var(--ok)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>2.</span> When you run the workflow, each step executes in order. Step outputs feed into the next step.</div>
+            <div><span style={{ color: "var(--ok)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>3.</span> If a step produces a PROCEED/SKIP decision, the next step can be configured to run only if the decision is PROCEED.</div>
+            <div><span style={{ color: "var(--ok)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>4.</span> Every result is permanently recorded on-chain. Anyone can verify what happened.</div>
+          </div>
         </div>
 
       </main>

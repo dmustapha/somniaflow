@@ -26,7 +26,7 @@ async function PipelineList() {
   ]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {stateResults.map((result, i) => {
         const id = DEMO_PIPELINE_IDS[i];
         if (result.status === "rejected") {
@@ -46,19 +46,19 @@ async function PipelineList() {
           ? stepDefs.map(d => agentDisplayName(d)).join(" → ")
           : `Pipeline #${id}`;
         const pipeDesc  = stepDefs.length > 0
-          ? `${stepDefs.length} agents · on-chain orchestration`
-          : "Multi-agent pipeline";
+          ? `${stepDefs.length} AI steps · blockchain-verified`
+          : "Multi-step AI workflow";
         const dotColor  = STATUS_COLOR[state.status] ?? "var(--text-lo)";
         const isRunning = state.status === "Running";
 
         return (
           <Link key={id} href={`/pipeline/${id}?demo=execute`} style={{ textDecoration: "none" }}>
             <div
-              className="sf-glass"
+              className="sf-glass sf-pipeline-item"
               style={{
                 padding: "16px 20px",
                 display: "flex", alignItems: "center", gap: "14px",
-                cursor: "pointer", transition: "background 0.15s",
+                cursor: "pointer",
               }}
             >
               <div
@@ -95,9 +95,9 @@ async function PipelineList() {
 
 function PipelineSkeleton() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {[1, 2].map(i => (
-        <div key={i} className="sf-glass" style={{ height: "64px", animation: "sf-pulse 1.5s ease-in-out infinite" }} />
+        <div key={i} className="sf-glass sf-shimmer" style={{ height: "64px" }} />
       ))}
     </div>
   );
@@ -123,18 +123,18 @@ export default function HomePage() {
           width: "100%",
           textAlign: "center",
         }}>
-          <div style={{
+          <div className="sf-fade-up" style={{
             fontSize: "11px", fontWeight: 500, letterSpacing: "0.18em",
             textTransform: "uppercase", color: "var(--brand)",
             marginBottom: "28px", fontFamily: "var(--font-mono)",
             display: "flex", alignItems: "center", gap: "16px",
           }}>
             <span style={{ width: "40px", height: "1px", background: "linear-gradient(90deg, transparent, var(--brand))", flexShrink: 0 }} />
-            On-chain multi-agent orchestration
+            AI workflows recorded on the blockchain
             <span style={{ width: "40px", height: "1px", background: "linear-gradient(90deg, var(--brand), transparent)", flexShrink: 0 }} />
           </div>
 
-          <h1 style={{
+          <h1 className="sf-fade-up sf-stagger-1" style={{
             fontFamily: "var(--font-serif)",
             fontSize: "clamp(30px, 3.8vw, 52px)",
             fontStyle: "italic",
@@ -144,33 +144,33 @@ export default function HomePage() {
             color: "var(--text-hi)",
             marginBottom: "22px",
           }}>
-            Chain AI agents together and{" "}
+            Chain AI steps together and{" "}
             <em style={{ color: "var(--brand)" }}>record every
-            decision permanently on-chain.</em>
+            decision permanently on the blockchain.</em>
           </h1>
 
-          <p style={{
+          <p className="sf-fade-up sf-stagger-2" style={{
             fontSize: "15px", lineHeight: 1.7, color: "var(--text-mid)",
             maxWidth: "560px", marginBottom: "36px",
             fontFamily: "var(--font-sans)",
           }}>
-            No server, no human in the loop. SomniaFlow chains AI agents into multi-step
-            pipelines where a smart contract decides what runs next. Every decision is
-            transparent and anyone can audit it on the blockchain.
+            Fully automatic. SomniaFlow connects AI steps into workflows where
+            the blockchain decides what runs next. Every decision is
+            transparent and anyone can verify it.
           </p>
 
           {/* Plain-English stat strip */}
-          <div className="sf-stat-grid" style={{
+          <div className="sf-stat-grid sf-fade-up sf-stagger-3" style={{
             display: "grid", gridTemplateColumns: "repeat(4,1fr)",
             border: "1px solid var(--border)",
             maxWidth: "540px", marginBottom: "32px",
             margin: "0 auto 32px",
           }}>
             {[
-              { val: "LIVE",   label: "On Somnia testnet",  color: "var(--ok)"      },
-              { val: "4",      label: "Agents per pipeline", color: "var(--text-hi)" },
-              { val: "100%",   label: "On-chain verifiable", color: "var(--ok)"      },
-              { val: "<1s",    label: "Block times",          color: "var(--text-hi)" },
+              { val: "LIVE",   label: "Network status",       color: "var(--ok)"      },
+              { val: "4",      label: "AI steps per workflow", color: "var(--text-hi)" },
+              { val: "100%",   label: "Publicly verifiable",  color: "var(--ok)"      },
+              { val: "<1s",    label: "Response speed",        color: "var(--text-hi)" },
             ].map((s, i) => (
               <div key={i} style={{
                 padding: "12px 14px",
@@ -193,15 +193,15 @@ export default function HomePage() {
           </div>
 
           {/* Demo CTAs */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
+          <div className="sf-fade-up sf-stagger-4" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=execute`}>
               <button className="sf-btn-primary">Watch a live demo</button>
             </Link>
             <Link href={`/pipeline/${DEMO_PIPELINE_IDS[0] ?? "1"}?demo=skip`}>
-              <button className="sf-btn-ghost">See the skip branch</button>
+              <button className="sf-btn-ghost">Watch AI skip a step</button>
             </Link>
           </div>
-          <div style={{ marginBottom: "48px" }}>
+          <div className="sf-fade-up sf-stagger-5" style={{ marginBottom: "48px" }}>
             <Link
               href="/compose"
               className="sf-btn-ghost"
@@ -211,18 +211,18 @@ export default function HomePage() {
                 display: "inline-flex", alignItems: "center", gap: "6px",
               }}
             >
-              Build your own pipeline <span style={{ fontSize: "16px" }}>→</span>
+              Build your own workflow <span style={{ fontSize: "16px" }}>→</span>
             </Link>
           </div>
 
           {/* Scroll cue */}
-          <div style={{
+          <div className="sf-fade-up sf-stagger-6" style={{
             fontSize: "11px", fontFamily: "var(--font-mono)",
             color: "var(--text-lo)", letterSpacing: "0.08em",
             display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
           }}>
-            <span>↓</span>
-            <span>see demo pipelines below</span>
+            <span className="sf-float">↓</span>
+            <span>see demo workflows below</span>
           </div>
         </div>
       </section>
@@ -247,7 +247,7 @@ export default function HomePage() {
               textTransform: "uppercase", color: "var(--text-lo)",
               marginBottom: "16px", fontFamily: "var(--font-sans)",
             }}>
-              Live demos
+              Demo workflows
             </div>
             <div className="sf-glass" style={{ padding: "20px" }}>
               <Suspense fallback={<PipelineSkeleton />}>
@@ -276,23 +276,24 @@ export default function HomePage() {
                 marginBottom: "14px",
               }}>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-hi)", fontFamily: "var(--font-sans)" }}>
-                  Pipeline logic
+                  Workflow logic
                 </div>
                 <span style={{
                   fontSize: "10px", padding: "3px 8px",
                   border: "1px solid rgba(74,222,128,0.3)", color: "var(--ok)",
                   fontFamily: "var(--font-mono)", fontWeight: 600,
+                  borderRadius: "20px",
                 }}>
                   ON-CHAIN
                 </span>
               </div>
 
               {[
-                { k: "Smart contract decides", v: "Reads each agent's output and decides which step runs next", cls: ""      },
-                { k: "Decision source",        v: "Smart contract — not a server, not an API",                 cls: "ok"    },
-                { k: "All steps run",          v: "Every agent executes and is recorded on-chain",             cls: ""      },
-                { k: "Step skipped",           v: "Contract blocks the step — still recorded on-chain",        cls: ""      },
-                { k: "Contract address",       v: REGISTRY_SHORT,                                              cls: "brand" },
+                { k: "Blockchain decides",     v: "Reads each step's output and picks what runs next",        cls: ""      },
+                { k: "Decision maker",         v: "The blockchain, not a company server",                      cls: "ok"    },
+                { k: "All steps run",          v: "Every AI step runs and gets saved to the blockchain",       cls: ""      },
+                { k: "Step skipped",           v: "Blockchain blocks the step, still saved as proof",          cls: ""      },
+                { k: "Blockchain address",     v: REGISTRY_SHORT,                                              cls: "brand" },
               ].map(({ k, v, cls }) => (
                 <div key={k} className="sf-dr">
                   <span className="sf-dr-key">{k}</span>
@@ -310,7 +311,7 @@ export default function HomePage() {
                     color: "var(--brand)", textDecoration: "none",
                   }}
                 >
-                  ↗ view contract on explorer
+                  ↗ verify on blockchain explorer
                 </a>
                 <Link
                   href="/proof"
@@ -319,7 +320,7 @@ export default function HomePage() {
                     color: "var(--text-mid)", textDecoration: "none",
                   }}
                 >
-                  See all recorded decisions →
+                  View all recorded results →
                 </Link>
               </div>
             </div>

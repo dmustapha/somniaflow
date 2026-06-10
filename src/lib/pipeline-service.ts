@@ -56,7 +56,7 @@ function getHttpProvider(): ethers.JsonRpcProvider {
 
 function getSigner(): Wallet {
   if (!_signer) {
-    const key = process.env.DEPLOYER_PRIVATE_KEY;
+    const key = process.env.DEPLOYER_PRIVATE_KEY?.trim();
     if (!key) throw new Error("DEPLOYER_PRIVATE_KEY not set");
     _signer = new Wallet(key, getHttpProvider());
   }
