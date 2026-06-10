@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SomniaFlow — Presentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --accent: #6366f1;
+    --accent2: #8b5cf6;
+    --green: #22c55e;
+    --cyan: #06b6d4;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .slide {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    width: 100vw;
+    padding: 60px 80px;
+    position: relative;
+  }
+
+  .slide.active { display: flex; }
+
+  /* Navigation */
+  .nav {
+    position: fixed;
+    bottom: 30px;
+    right: 40px;
+    display: flex;
+    gap: 12px;
+    z-index: 100;
+  }
+  .nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .nav button:hover { background: var(--border); }
+
+  .progress {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.3s ease;
+  }
+
+  .slide-num {
+    position: fixed;
+    bottom: 34px;
+    left: 40px;
+    font-size: 13px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Typography */
+  h1 {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    line-height: 1.1;
+    margin-bottom: 20px;
+  }
+  h2 {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    line-height: 1.2;
+    margin-bottom: 24px;
+  }
+  h3 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    margin-bottom: 16px;
+  }
+  p, li {
+    font-size: 20px;
+    line-height: 1.6;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .subtitle {
+    font-size: 22px;
+    color: var(--muted);
+    font-weight: 400;
+    max-width: 700px;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .accent { color: var(--accent); }
+  .green { color: var(--green); }
+  .cyan { color: var(--cyan); }
+
+  /* Layouts */
+  .left-align {
+    align-items: flex-start;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+  .card h3 { margin-bottom: 12px; }
+  .card p { font-size: 17px; }
+
+  ul { list-style: none; padding: 0; }
+  ul li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 19px;
+  }
+  ul li:last-child { border-bottom: none; }
+  ul li::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 14px;
+    vertical-align: middle;
+  }
+
+  .tag {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    color: var(--muted);
+    margin: 4px;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 40px;
+    margin-top: 32px;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat .num {
+    font-size: 48px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat .label {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Pipeline diagram */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 24px;
+  }
+  .pipeline .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    text-align: center;
+    min-width: 160px;
+  }
+  .pipeline .step .step-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .pipeline .step .step-type {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .pipeline .arrow {
+    font-size: 24px;
+    color: var(--accent);
+    padding: 0 8px;
+  }
+  .pipeline .step.conditional {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+  }
+
+  /* Logo */
+  .logo-mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 24px;
+    color: white;
+  }
+
+  .mono {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 15px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px 28px;
+    border-radius: 12px;
+    color: var(--cyan);
+    margin-top: 16px;
+    white-space: pre;
+    line-height: 1.7;
+  }
+
+  .badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 18px;
+  }
+  .link:hover { text-decoration: underline; }
+
+  @media (max-width: 900px) {
+    .slide { padding: 40px 32px; }
+    h1 { font-size: 36px; }
+    h2 { font-size: 28px; }
+    .two-col { grid-template-columns: 1fr; gap: 24px; }
+    .pipeline { flex-wrap: wrap; justify-content: center; }
+    .stat-row { flex-wrap: wrap; gap: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Title -->
+<div class="slide active" id="s1">
+  <div class="logo-mark">S</div>
+  <h1>SomniaFlow</h1>
+  <p class="subtitle">On-chain multi-agent orchestration on Somnia.<br>Register a pipeline. Trigger it once. Every agent handoff is recorded on-chain.</p>
+  <div class="stat-row">
+    <div class="stat"><div class="num">4</div><div class="label">Agent Types</div></div>
+    <div class="stat"><div class="num">47</div><div class="label">Contract Tests</div></div>
+    <div class="stat"><div class="num">56+</div><div class="label">Registry Agents</div></div>
+  </div>
+</div>
+
+<!-- Slide 2: The Problem -->
+<div class="slide" id="s2">
+  <div class="left-align" style="max-width: 800px;">
+    <div class="badge">The Problem</div>
+    <h2>Multi-agent coordination on Somnia has no on-chain layer</h2>
+    <ul>
+      <li>Every multi-agent workflow today relies on a centralized off-chain server to decide what runs next</li>
+      <li>No verifiable record of which agent produced which result, or why a step was skipped</li>
+      <li>If the coordinator goes down or acts maliciously, there is no audit trail</li>
+      <li>Users cannot compose agents from different builders into a single trustless pipeline</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Slide 3: The Solution -->
+<div class="slide" id="s3">
+  <div class="left-align" style="max-width: 800px;">
+    <div class="badge">The Solution</div>
+    <h2>A smart contract that orchestrates agents</h2>
+    <ul>
+      <li><strong class="accent">PipelineRegistry.sol</strong> — an on-chain FSM that stores pipeline definitions, tracks execution state, and emits events</li>
+      <li><strong class="accent">Conditional branching</strong> — agents can output EXECUTE or SKIP, and the contract enforces the branch path</li>
+      <li><strong class="accent">Relay coordinator</strong> — listens to StepCompleted events and dispatches the next agent. The contract is the source of truth, not the relay</li>
+      <li><strong class="accent">Agent Registry integration</strong> — compose pipelines from 56+ agents already registered on Somnia</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Slide 4: How It Works -->
+<div class="slide" id="s4">
+  <div style="text-align: center; max-width: 1000px;">
+    <div class="badge">Architecture</div>
+    <h2>Pipeline execution flow</h2>
+    <div class="pipeline">
+      <div class="step">
+        <div class="step-name">Crypto Price</div>
+        <div class="step-type">JSON API Agent</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="step-name">Fear & Greed</div>
+        <div class="step-type">JSON API Agent</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step conditional">
+        <div class="step-name">Risk Evaluator</div>
+        <div class="step-type">Algorithmic Scorer</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="step-name">Market Data</div>
+        <div class="step-type">Conditional Step</div>
+      </div>
+    </div>
+    <div class="mono">User triggers pipeline
+    &darr;
+PipelineRegistry.sol emits StepCompleted(pipelineId, step, result)
+    &darr;
+relay-coordinator.ts listens, calls dispatchNext()
+    &darr;
+Loop until all steps done &mdash; every result stored on-chain</div>
+  </div>
+</div>
+
+<!-- Slide 5: Features -->
+<div class="slide" id="s5">
+  <div class="badge">Features</div>
+  <h2>What makes SomniaFlow different</h2>
+  <div class="two-col" style="margin-top: 16px;">
+    <div class="card">
+      <h3 class="accent">On-Chain FSM</h3>
+      <p>The smart contract stores every pipeline step, agent assignment, and execution result. The blockchain is the coordinator, not an off-chain server.</p>
+    </div>
+    <div class="card">
+      <h3 class="accent">Conditional Branching</h3>
+      <p>The Risk Evaluator outputs EXECUTE or SKIP. Downstream steps respect the decision, and the branch path is permanently recorded on-chain.</p>
+    </div>
+    <div class="card">
+      <h3 class="accent">Pipeline Composer</h3>
+      <p>Build custom pipelines from the UI. Choose agents, set conditions, deploy and fund on-chain. No code required.</p>
+    </div>
+    <div class="card">
+      <h3 class="accent">Real-Time Streaming</h3>
+      <p>Server-Sent Events stream every step completion to the frontend as it happens. Watch agents coordinate live.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 6: Tech Stack -->
+<div class="slide" id="s6">
+  <div class="left-align" style="max-width: 800px;">
+    <div class="badge">Tech Stack</div>
+    <h2>Built for Somnia</h2>
+    <ul>
+      <li><strong>Smart Contracts:</strong> Solidity 0.8.20 + Foundry (47 passing tests)</li>
+      <li><strong>Chain:</strong> Somnia Shannon testnet (chain ID 50312)</li>
+      <li><strong>Frontend:</strong> Next.js 14 App Router + Tailwind CSS</li>
+      <li><strong>Events:</strong> Native SSE via ReadableStream</li>
+      <li><strong>Blockchain Client:</strong> ethers.js v6 (HTTP polling)</li>
+      <li><strong>Agent Registry:</strong> Integrated with Somnia's on-chain registry (56+ agents)</li>
+    </ul>
+    <div style="margin-top: 24px;">
+      <span class="tag">Solidity</span>
+      <span class="tag">Foundry</span>
+      <span class="tag">Next.js 14</span>
+      <span class="tag">ethers.js</span>
+      <span class="tag">TypeScript</span>
+      <span class="tag">Tailwind CSS</span>
+      <span class="tag">SSE</span>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 7: On-Chain Proof -->
+<div class="slide" id="s7">
+  <div class="left-align" style="max-width: 800px;">
+    <div class="badge">Verification</div>
+    <h2>Everything is provable on-chain</h2>
+    <p style="margin-bottom: 24px;">Every pipeline execution produces transaction hashes you can verify on Shannon Explorer.</p>
+    <div class="mono">Contract: 0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1
+
+cast call 0x7B19...3e1 \
+  "getPipeline(uint256)(address,bool,uint8,uint256)" 1 \
+  --rpc-url https://dream-rpc.somnia.network</div>
+    <ul style="margin-top: 24px;">
+      <li>Proof page shows live contract state + transaction history</li>
+      <li>Click any TX hash to open Shannon Explorer</li>
+      <li>StepCompleted events show every agent handoff in order</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Slide 8: Demo & Links -->
+<div class="slide" id="s8">
+  <div class="logo-mark">S</div>
+  <h1>Try it live</h1>
+  <p class="subtitle" style="margin-bottom: 32px;">Run a pipeline, watch agents coordinate on-chain, verify every step on Shannon Explorer.</p>
+  <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
+    <a href="https://somniaflow.vercel.app" target="_blank" class="link">somniaflow.vercel.app</a>
+    <a href="https://github.com/dmustapha/somniaflow" target="_blank" class="link">github.com/dmustapha/somniaflow</a>
+    <a href="https://shannon-explorer.somnia.network/address/0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1" target="_blank" class="link">View Contract on Shannon Explorer</a>
+  </div>
+  <div style="margin-top: 40px; color: var(--muted); font-size: 16px;">
+    Built by Damilola Mustapha for the Somnia Agentathon (Encode Club)
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button onclick="prev()">&larr; Prev</button>
+  <button onclick="next()">Next &rarr;</button>
+</div>
+<div class="progress" id="progress"></div>
+<div class="slide-num" id="slideNum">1 / 8</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+  const total = slides.length;
+
+  function show(n) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(n, total - 1));
+    slides[current].classList.add('active');
+    document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+    document.getElementById('slideNum').textContent = (current + 1) + ' / ' + total;
+  }
+
+  function next() { show(current + 1); }
+  function prev() { show(current - 1); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  });
+
+  show(0);
+</script>
+</body>
+</html>
