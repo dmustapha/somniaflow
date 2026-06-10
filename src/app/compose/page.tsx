@@ -1,34 +1,27 @@
 // Pipeline Composer — build and deploy custom multi-agent flows on Somnia
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SiteNav } from "@/components/SiteNav";
 import type { PipelineStepInput } from "@/types";
+import type { SomniaAgent } from "@/lib/agent-registry";
 
-const AGENT_TYPES = [
-  {
-    value: 0 as const,
-    name: "JSON API",
-    desc: "Fetch data from any JSON endpoint and extract a value",
+// Placeholder/hint config per execution type
+const TYPE_CONFIG: Record<number, { placeholder: string; hint: string }> = {
+  0: {
     placeholder: "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT|price|0",
     hint: "Format: url|jsonPath|decimals — e.g. https://api.example.com/price|data.price|2",
   },
-  {
-    value: 1 as const,
-    name: "AI Inference",
-    desc: "Send data to an LLM to get a EXECUTE/SKIP decision with reasoning",
+  1: {
     placeholder: "Analyze this price data and decide whether to rebalance: {prevResult}",
     hint: "Use {prevResult} to reference the previous step's output",
   },
-  {
-    value: 2 as const,
-    name: "Web Parse",
-    desc: "Scrape a webpage and extract structured information with AI",
+  2: {
     placeholder: "https://example.com|Extract the main headline and key metrics|0",
     hint: "Format: url|extractionPrompt|0",
   },
-] as const;
+};
 
 const EXAMPLES = [
   {
@@ -50,6 +43,8 @@ const EXAMPLES = [
 
 interface StepDraft extends PipelineStepInput {
   _id: number;
+  // agent from registry (for display only — execution type is agentType)
+  selectedAgentId?: number;
 }
 
 let idCounter = 0;
@@ -60,10 +55,21 @@ function newStep(agentType: 0 | 1 | 2 = 0): StepDraft {
 
 export default function ComposePage() {
   const router = useRouter();
-  const [steps,      setSteps]      = useState<StepDraft[]>([newStep(0), newStep(1)]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const [steps,         setSteps]        = useState<StepDraft[]>([newStep(0), newStep(1)]);
+  const [submitting,    setSubmitting]    = useState(false);
+  const [error,         setError]        = useState<string | null>(null);
+  const [pipelineId,    setPipelineId]   = useState<string | null>(null);
+  const [agents,        setAgents]       = useState<SomniaAgent[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(true);
+
+  // Fetch live agents from Somnia registry on mount
+  useEffect(() => {
+    fetch("/api/agents")
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.agents)) setAgents(d.agents); })
+      .catch(() => {/* silent — compose still works without registry */})
+      .finally(() => setAgentsLoading(false));
+  }, []);
 
   function addStep() {
     if (steps.length >= 5) return;
@@ -178,7 +184,8 @@ export default function ComposePage() {
         {/* Steps */}
         <div style={{ marginBottom: "24px" }}>
           {steps.map((step, i) => {
-            const agentInfo = AGENT_TYPES.find(a => a.value === step.agentType)!;
+            const typeCfg = TYPE_CONFIG[step.agentType] ?? TYPE_CONFIG[0];
+            const selectedAgent = agents.find(a => a.id === step.selectedAgentId);
             return (
               <div key={step._id} style={{ marginBottom: "12px" }}>
                 <div className="sf-glass" style={{ padding: "20px" }}>
@@ -200,7 +207,7 @@ export default function ComposePage() {
                         fontSize: "10px", fontFamily: "var(--font-mono)",
                         color: "var(--brand)",
                       }}>
-                        {agentInfo.name}
+                        {selectedAgent?.name ?? ["JSON API", "AI Inference", "Web Parse"][step.agentType]}
                       </span>
                     </div>
                     {steps.length > 1 && (
@@ -219,25 +226,44 @@ export default function ComposePage() {
                     )}
                   </div>
 
-                  {/* Agent type selector */}
+                  {/* Agent picker — live from Somnia registry */}
                   <div style={{ marginBottom: "12px" }}>
                     <div style={{
-                      fontSize: "11px", color: "var(--text-lo)",
-                      fontFamily: "var(--font-mono)", marginBottom: "6px",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      marginBottom: "6px",
                     }}>
-                      AGENT TYPE
+                      <div style={{
+                        fontSize: "11px", color: "var(--text-lo)",
+                        fontFamily: "var(--font-mono)",
+                      }}>
+                        SELECT AGENT
+                      </div>
+                      {agentsLoading && (
+                        <span style={{ fontSize: "10px", color: "var(--text-lo)", fontFamily: "var(--font-mono)" }}>
+                          fetching from chain…
+                        </span>
+                      )}
+                      {!agentsLoading && (
+                        <span style={{ fontSize: "10px", color: "var(--text-lo)", fontFamily: "var(--font-mono)" }}>
+                          ◈ {agents.length} agents on Somnia
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      {AGENT_TYPES.map(a => (
+                      {agents.map(a => (
                         <button
-                          key={a.value}
-                          onClick={() => updateStep(step._id, { agentType: a.value })}
+                          key={a.id}
+                          onClick={() => updateStep(step._id, {
+                            agentType: a.executionType,
+                            selectedAgentId: a.id,
+                          })}
+                          title={a.description}
                           style={{
                             fontSize: "11px", fontFamily: "var(--font-mono)",
                             padding: "5px 12px", cursor: "pointer",
-                            border: `1px solid ${step.agentType === a.value ? "var(--brand)" : "var(--border)"}`,
-                            background: step.agentType === a.value ? "var(--brand-dim)" : "transparent",
-                            color: step.agentType === a.value ? "var(--brand)" : "var(--text-lo)",
+                            border: `1px solid ${step.selectedAgentId === a.id ? "var(--brand)" : "var(--border)"}`,
+                            background: step.selectedAgentId === a.id ? "var(--brand-dim)" : "transparent",
+                            color: step.selectedAgentId === a.id ? "var(--brand)" : "var(--text-lo)",
                             transition: "all 0.15s",
                           }}
                         >
@@ -245,12 +271,17 @@ export default function ComposePage() {
                         </button>
                       ))}
                     </div>
-                    <div style={{
-                      fontSize: "11px", color: "var(--text-lo)",
-                      fontFamily: "var(--font-sans)", marginTop: "6px",
-                    }}>
-                      {agentInfo.desc}
-                    </div>
+                    {selectedAgent && (
+                      <div style={{
+                        fontSize: "11px", color: "var(--text-lo)",
+                        fontFamily: "var(--font-sans)", marginTop: "6px", lineHeight: 1.5,
+                      }}>
+                        {selectedAgent.description}
+                        <span style={{ color: "var(--brand)", marginLeft: "6px" }}>
+                          [{selectedAgent.typeLabel}]
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Input template */}
@@ -264,7 +295,7 @@ export default function ComposePage() {
                     <textarea
                       value={step.inputTemplate}
                       onChange={e => updateStep(step._id, { inputTemplate: e.target.value })}
-                      placeholder={agentInfo.placeholder}
+                      placeholder={typeCfg.placeholder}
                       rows={3}
                       style={{
                         width: "100%", boxSizing: "border-box",
@@ -280,7 +311,7 @@ export default function ComposePage() {
                       fontSize: "10px", color: "var(--text-lo)",
                       fontFamily: "var(--font-sans)", marginTop: "4px",
                     }}>
-                      {agentInfo.hint}
+                      {typeCfg.hint}
                     </div>
                   </div>
 

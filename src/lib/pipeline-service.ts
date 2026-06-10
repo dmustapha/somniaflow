@@ -9,8 +9,8 @@ import type { PipelineStepInput, PipelineStepDef, PipelineStateView, PipelineSSE
 // [VERIFIED] — Shannon testnet HTTP RPC (WebSocket unstable; polling via JsonRpcProvider)
 const HTTP_RPC = "https://dream-rpc.somnia.network";
 
-const _REGISTRY_RAW = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6";
-const REGISTRY_ADDRESS = ethers.isAddress(_REGISTRY_RAW) ? ethers.getAddress(_REGISTRY_RAW) : "0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6";
+const _REGISTRY_RAW = process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc";
+const REGISTRY_ADDRESS = ethers.isAddress(_REGISTRY_RAW) ? ethers.getAddress(_REGISTRY_RAW) : "0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc";
 const EXPLORER         = "https://shannon-explorer.somnia.network";
 
 // ABI — minimal set of functions and events needed by the integration layer

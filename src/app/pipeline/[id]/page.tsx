@@ -64,13 +64,15 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
 
   const sseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function startSSE(autoSimulate?: "execute" | "skip") {
+  function startSSE(autoSimulate?: "execute" | "skip", trigger?: boolean) {
     if (esRef.current) esRef.current.close();
     if (sseTimeoutRef.current) clearTimeout(sseTimeoutRef.current);
 
     const url = autoSimulate
       ? `/api/pipeline/${params.id}/stream?autoSimulate=${autoSimulate}`
-      : `/api/pipeline/${params.id}/stream`;
+      : trigger
+        ? `/api/pipeline/${params.id}/stream?trigger=true`
+        : `/api/pipeline/${params.id}/stream`;
     const es = new EventSource(url);
     esRef.current = es;
     es.onmessage = (e) => handleEvent(JSON.parse(e.data) as PipelineSSEEvent);
@@ -199,27 +201,10 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
     setTotalMs(null);
     setTxHashes([]);
     setIsSimulated(false);
-    startSSE();
-
-    try {
-      const res = await fetch("/api/pipeline/trigger", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ pipelineId: params.id }),
-      });
-      if (!res.ok) {
-        const { error: msg } = await res.json().catch(() => ({ error: null }));
-        if (res.status === 402) {
-          setError(msg ?? "Insufficient STT balance. Fund the pipeline before triggering.");
-        } else {
-          setError(msg ?? "Trigger failed");
-        }
-        esRef.current?.close();
-        if (sseTimeoutRef.current) { clearTimeout(sseTimeoutRef.current); sseTimeoutRef.current = null; }
-      }
-    } finally {
-      setTriggering(false);
-    }
+    // Pass trigger=true so relay + event listener + tx all run in the same
+    // serverless function instance — Vercel-safe, no cross-process pipelineBus.
+    startSSE(undefined, true);
+    setTriggering(false);
   }
 
   // Load previous run state on mount + URL param auto-trigger
@@ -364,8 +349,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
               fontSize: "13px", color: "var(--text-lo)", marginBottom: "28px",
               fontFamily: "var(--font-sans)", lineHeight: 1.6, maxWidth: "460px",
             }}>
-              Choose a demo to the right and watch three AI agents run live, one after the other.
-              You&apos;ll see each step complete in real time.
+              Trigger the pipeline on-chain or run a demo to watch the agents execute step by step in real time.
             </p>
           )}
 
@@ -453,36 +437,49 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
           <div className="sf-glass" style={{ padding: "20px" }}>
             <div style={{
               fontSize: "13px", fontWeight: 600,
-              color: "var(--text-hi)", marginBottom: "14px",
+              color: "var(--text-hi)", marginBottom: "4px",
               fontFamily: "var(--font-sans)",
             }}>
-              Run Demo
+              Run Pipeline
+            </div>
+            <div style={{
+              fontSize: "11px", color: "var(--text-lo)",
+              fontFamily: "var(--font-sans)", marginBottom: "14px", lineHeight: 1.5,
+            }}>
+              Live run records results on Somnia. Demo mode simulates locally.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button
-                onClick={() => handleSimulate("execute")}
+                onClick={handleTrigger}
                 disabled={isRunning}
                 className="sf-btn-primary"
+                title="Triggers a real on-chain transaction — requires a funded pipeline wallet"
                 style={{ width: "100%", textAlign: "center" }}
               >
-                {triggering ? "starting..." : "Run demo: AI executes all steps"}
+                {triggering ? "starting…" : "▶ Trigger live on-chain"}
+              </button>
+              <div style={{
+                fontSize: "10px", color: "var(--text-lo)",
+                fontFamily: "var(--font-mono)", textAlign: "center",
+                letterSpacing: "0.06em",
+              }}>
+                — or try a demo —
+              </div>
+              <button
+                onClick={() => handleSimulate("execute")}
+                disabled={isRunning}
+                className="sf-btn-ghost"
+                style={{ width: "100%", textAlign: "center", fontSize: "11px" }}
+              >
+                Demo: AI executes all steps
               </button>
               <button
                 onClick={() => handleSimulate("skip")}
                 disabled={isRunning}
                 className="sf-btn-ghost"
-                style={{ width: "100%", textAlign: "center" }}
-              >
-                Run demo: AI skips a step
-              </button>
-              <button
-                onClick={handleTrigger}
-                disabled={isRunning}
-                className="sf-btn-ghost"
-                title="Triggers a real on-chain transaction — requires a funded pipeline wallet"
                 style={{ width: "100%", textAlign: "center", fontSize: "11px" }}
               >
-                ▶ Trigger live on-chain
+                Demo: AI skips a step
               </button>
             </div>
 
@@ -588,7 +585,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                   See all recorded decisions →
                 </Link>
                 <a
-                  href={`${EXPLORER}/address/0xF1d42cC99604b1AE50322156AF1AE28db965Cbd6`}
+                  href={`${EXPLORER}/address/${process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0x1DEc4313A4d24Acb2DC9Bf3E03101176e88fCeBc"}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
