@@ -107,7 +107,6 @@ async function main() {
   console.log(`Funding pipeline ${pipelineId} with ${fundAmount} STT...`);
   const tx2 = await contract.fundPipeline(BigInt(pipelineId), {
     value: ethers.parseEther(fundAmount),
-    gasLimit: 500_000,
   });
   await tx2.wait();
   console.log(`Funded → tx=${tx2.hash}`);
