@@ -1,4 +1,6 @@
-# SomniaFlow
+# SomniaFlow: On-Chain Multi-Agent Orchestration Protocol
+
+Register a pipeline of AI agents on-chain, trigger it once, and the blockchain coordinates everything. Every step, every decision, every branch path is a transaction on Somnia Shannon testnet. No off-chain controller decides the outcome.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
@@ -6,149 +8,127 @@
 [![Tests](https://img.shields.io/badge/tests-47_passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-The first on-chain multi-agent orchestration protocol on Somnia. Register a pipeline once, trigger it once, and watch four agents coordinate autonomously. Every step is recorded on Shannon testnet through an on-chain FSM.
-
-![SomniaFlow home page](docs/images/landing.png)
-
-**Live demo:** [somniaflow.vercel.app](https://somniaflow.vercel.app)
-**Contract:** [`0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1`](https://shannon-explorer.somnia.network/address/0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1) on Shannon testnet
+**Live:** [somniaflow.vercel.app](https://somniaflow.vercel.app)
 
 ---
 
-## What It Does
+![SomniaFlow landing page](docs/images/landing.png)
 
-Today, every multi-agent workflow on Somnia requires an off-chain coordinator. There is no on-chain mechanism for Agent A's output to automatically trigger Agent B in a trustless, auditable way. SomniaFlow fixes this.
+## Live Demo
 
-The core is `PipelineRegistry.sol` — an on-chain FSM that stores pipeline definitions (ordered steps, agent assignments, balances) and emits `StepCompleted` events as each agent finishes. An off-chain relay coordinator listens to these events and dispatches the next step, giving you verifiable multi-agent coordination with every handoff recorded on-chain.
+**[somniaflow.vercel.app](https://somniaflow.vercel.app)**
 
-**Demo pipeline (4 agents):**
-1. **Crypto Price** — fetches live BTC price from CoinGecko, Binance, and CoinPaprika (multi-source average)
-2. **Fear & Greed** — fetches the market sentiment index from alternative.me
-3. **Risk Evaluator** — algorithmic risk scorer (4-component: sentiment, price stability, timing, volatility). Outputs EXECUTE or SKIP
-4. **Market Data** — fetches top movers by market cap. Conditional: only runs if the Risk Evaluator says EXECUTE
+Click "Watch a live demo" to see a 4-agent pipeline execute end-to-end with live blockchain verification. Click "Watch AI skip a step" to see conditional branching in action.
 
-Every decision, step result, and branch path is stored as a transaction on Shannon testnet.
+---
+
+## What Is SomniaFlow?
+
+Multi-agent AI workflows today run on centralized servers. One company decides what agent runs next, which steps get skipped, and what results get stored. None of it is auditable.
+
+SomniaFlow moves the coordination layer on-chain. A Solidity smart contract (`PipelineRegistry.sol`) acts as a finite state machine: it stores pipeline definitions, advances steps, evaluates branch conditions, and records every result as a transaction. The contract is the source of truth, not a server.
+
+---
+
+## Screenshots
+
+| Landing Page | Pipeline Execution |
+|---|---|
+| ![Landing](docs/images/landing.png) | ![Pipeline](docs/images/pipeline.png) |
+
+| Workflow Composer | Blockchain Proof |
+|---|---|
+| ![Compose](docs/images/compose.png) | ![Proof](docs/images/proof.png) |
 
 ---
 
 ## Features
 
-- **On-chain pipeline FSM**: `PipelineRegistry.sol` stores ordered steps, agent assignments, and balances; the contract is the source of truth
-- **Conditional branching**: agents can mark steps as Skip, advancing past dependent steps without an off-chain controller deciding
-- **Pipeline Composer**: build custom pipelines from the UI — choose agents, set conditional logic, deploy and fund on-chain from `/compose`
-- **Live SSE stream**: the frontend streams step events in real time via Server-Sent Events, no WebSocket dependency
-- **Demo mode**: pipelines run in-browser without STT via the simulate path, enabling review without testnet funds
+- **On-chain pipeline FSM**: `PipelineRegistry.sol` stores ordered steps, agent assignments, and balances. The contract is the source of truth
+- **Conditional branching**: the Risk Evaluator agent outputs EXECUTE or SKIP, and `_containsExecute()` (pure Solidity) gates downstream steps on-chain
+- **Pipeline Composer**: build custom pipelines from the UI at `/compose`. Choose agents, set conditional logic, deploy and fund on-chain
+- **4 agent types**: JSON API, LLM Inference, LLM Parse Website, External. Each has a different dispatch and response path
+- **Live SSE streaming**: the frontend streams step events in real time via Server-Sent Events
+- **Demo mode**: pipelines run in-browser without STT via the simulate path, so anyone can review without testnet funds
 - **Proof page**: live contract state and transaction hashes, queryable on Shannon Explorer
-- **47 forge tests**: full coverage of registration, dispatch, fund management, and access control
+- **47 Foundry tests**: full coverage of registration, dispatch, fund management, conditional branching, and access control
 
 ---
 
-## How to Verify On-Chain
-
-1. Open the [Proof page](https://somniaflow.vercel.app/proof) — it fetches live state from the contract
-2. Click any transaction hash to open [Shannon Explorer](https://shannon-explorer.somnia.network)
-3. The `StepCompleted` events show every agent handoff in order
-
-Or query directly:
-```bash
-cast call 0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1 \
-  "getPipeline(uint256)(address,bool,uint8,uint256)" 1 \
-  --rpc-url https://dream-rpc.somnia.network
-```
-
----
-
-## Architecture
+## How It Works
 
 ```
-User triggers pipeline
-        │
-        ▼
-PipelineRegistry.sol ──► emits StepCompleted(pipelineId, stepIndex, result)
-        │                          │
-        │                          ▼
-        │                 relay-coordinator.ts
-        │                 (HTTP polling via ethers.js JsonRpcProvider)
-        │                          │
-        │                          ▼
-        │                 dispatchNext(pipelineId)
-        │                          │
-        └──────────────────────────┘
-                (loop until all steps done)
+User triggers pipeline via UI
+        |
+        v
+PipelineRegistry.sol (on-chain FSM)
+        |
+        +---> registerPipeline()   stores step definitions on-chain
+        +---> triggerPipeline()    starts step 0, emits StepCompleted
+        +---> handleResponse()     records result, evaluates branch condition
+        +---> _containsExecute()   pure Solidity gate: EXECUTE or SKIP
+        +---> dispatchNext()       advances to next step
+        |
+        v
+relay-coordinator.ts (off-chain relay)
+        |
+        +---> Listens for StepCompleted events via HTTP polling
+        +---> Calls dispatchNext() to advance the FSM
+        +---> Cannot change the branch outcome (read-only relay)
+        |
+        v
+Next.js Frontend (SSE stream)
+        |
+        +---> Real-time step updates via Server-Sent Events
+        +---> Proof page links every TX to Shannon Explorer
 ```
 
-Every agent call, result, and branch decision is recorded as a transaction on Shannon testnet. No centralized coordinator controls the outcome — the contract is the source of truth.
+### Demo Pipeline (4 Agents)
+
+| Step | Agent | Type | Role |
+|------|-------|------|------|
+| 1 | Crypto Price | JSON API | Fetches live BTC price from CoinGecko, Binance, CoinPaprika (multi-source average) |
+| 2 | Fear & Greed | JSON API | Fetches market sentiment index from alternative.me |
+| 3 | Risk Evaluator | LLM Inference | 4-component risk scorer (sentiment, price stability, timing, volatility). Outputs EXECUTE or SKIP |
+| 4 | Market Data | JSON API | Fetches top movers by market cap. Only runs if Risk Evaluator outputs EXECUTE |
+
+Both branches are proven on-chain: Pipeline 1 hit SKIP (step 4 blocked), Pipeline 2 hit EXECUTE (all 4 steps ran).
 
 ---
 
 ## Tech Stack
 
-| Layer | Choice |
-|---|---|
+| Layer | Technology |
+|-------|-----------|
 | Smart contracts | Solidity 0.8.20 + Foundry |
 | Chain | Somnia Shannon testnet (chain ID 50312) |
 | Frontend | Next.js 14 App Router |
 | Events | Native SSE (ReadableStream) |
 | Blockchain client | ethers.js v6 (HTTP polling) |
-| Relay | TypeScript relay coordinator listening to `StepCompleted` events |
-| Styling | Tailwind CSS 3 |
+| Relay | TypeScript relay coordinator |
+| AI | Anthropic Claude API (LLM Inference steps) |
+| Styling | CSS custom properties (dark observatory theme) |
 
 ---
 
-## Running Locally
-
-### Prerequisites
-
-- Node.js 18+
-- [Foundry](https://book.getfoundry.sh/getting-started/installation)
-- A funded Shannon testnet wallet (get STT from the Somnia Discord faucet)
-
-### 1. Install dependencies
-
-```bash
-npm install
-forge install
-```
-
-### 2. Configure environment
-
-```bash
-cp .env.local.example .env.local
-```
-
-Fill in `.env.local`:
-```env
-DEPLOYER_PRIVATE_KEY=0x_your_private_key_here
-DEPLOYER_ADDRESS=0x_your_address_here
-NEXT_PUBLIC_REGISTRY_ADDRESS=0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1
-NEXT_PUBLIC_DEMO_PIPELINE_IDS=1,2
-ANTHROPIC_API_KEY=sk-ant-your_key_here          # Required for AI Inference steps
-API_KEY=                                         # Optional: set to lock mutating routes
-```
-
-### 3. Run the frontend
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-### 4. (Optional) Seed demo pipelines on-chain
-
-Requires 4+ STT in your wallet to fund both demo pipelines:
-
-```bash
-npx ts-node scripts/seed-demo.ts
-```
-
-### 5. Run contract tests
+## Testing
 
 ```bash
 forge test -v
+# Result: 47/47 passing
 ```
 
-47/47 tests pass. Coverage includes pipeline registration, step dispatch, fund management, and access control.
+Tests cover pipeline registration, step dispatch, fund management, conditional branching (`_containsExecute`), access control, and edge cases (empty steps, unknown pipeline IDs, double triggers).
+
+---
+
+## Try It (2 minutes)
+
+1. Go to [somniaflow.vercel.app](https://somniaflow.vercel.app)
+2. Click "Watch a live demo" to see the EXECUTE branch (all 4 agents run)
+3. Click "Watch AI skip a step" to see the SKIP branch (step 4 blocked by the contract)
+4. Open the [Proof page](https://somniaflow.vercel.app/proof) and click any TX hash to verify on Shannon Explorer
+5. Try the [Pipeline Composer](https://somniaflow.vercel.app/compose) to build a custom workflow
 
 ---
 
@@ -179,13 +159,65 @@ function ownerHandleResponse(uint256 pipelineId, uint256 stepIndex, string calld
 
 ---
 
-## Deployed Contract
+## On-Chain Verification
 
-| Network | Address | Explorer |
-|---|---|---|
-| Shannon testnet | `0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1` | [View](https://shannon-explorer.somnia.network/address/0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1) |
+| What | Address / Link |
+|------|----------------|
+| PipelineRegistry | [`0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1`](https://shannon-explorer.somnia.network/address/0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1) |
+| Shannon Platform | [`0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776`](https://shannon-explorer.somnia.network/address/0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776) |
+| Chain ID | 50312 |
+| RPC | `https://dream-rpc.somnia.network` |
+| Explorer | [shannon-explorer.somnia.network](https://shannon-explorer.somnia.network) |
 
-**Shannon testnet:** Chain ID 50312 | RPC `https://dream-rpc.somnia.network` | Explorer `shannon-explorer.somnia.network`
+Verify yourself:
+```bash
+cast call 0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1 \
+  "getPipeline(uint256)(address,bool,uint8,uint256)" 1 \
+  --rpc-url https://dream-rpc.somnia.network
+```
+
+---
+
+## Running Locally
+
+### Prerequisites
+
+- Node.js 18+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation)
+- A funded Shannon testnet wallet (get STT from the Somnia Discord faucet)
+
+### Install and run
+
+```bash
+git clone https://github.com/dmustapha/somniaflow.git
+cd somniaflow
+npm install
+forge install
+cp .env.example .env.local
+# Fill in your private key, wallet address, and Anthropic API key
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Seed demo pipelines on-chain
+
+Requires 4+ STT in your wallet:
+
+```bash
+npx ts-node scripts/seed-demo.ts
+```
+
+### Required Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DEPLOYER_PRIVATE_KEY` | Shannon testnet wallet private key |
+| `DEPLOYER_ADDRESS` | Wallet address matching the private key |
+| `NEXT_PUBLIC_REGISTRY_ADDRESS` | PipelineRegistry contract address |
+| `NEXT_PUBLIC_DEMO_PIPELINE_IDS` | Comma-separated pipeline IDs for the demo |
+| `ANTHROPIC_API_KEY` | Required for LLM Inference agent steps |
+| `API_KEY` | Optional: locks mutating API routes |
 
 ---
 
@@ -194,25 +226,34 @@ function ownerHandleResponse(uint256 pipelineId, uint256 stepIndex, string calld
 ```
 somniaflow/
 ├── contracts/
-│   ├── PipelineRegistry.sol   # On-chain FSM contract
-│   └── ChainTest.sol          # Chain connectivity test
+│   └── PipelineRegistry.sol    # On-chain FSM contract (667 lines)
 ├── src/
-│   └── app/
-│       ├── page.tsx            # Home — pipeline cards + stat strip
-│       ├── pipeline/[id]/      # Pipeline detail + SSE stream UI
-│       ├── compose/            # Pipeline Composer — build custom pipelines on-chain
-│       ├── proof/              # Live on-chain proof page
-│       └── api/pipeline/       # Backend routes (register, fund, trigger, state, stream, reset)
+│   ├── app/
+│   │   ├── page.tsx             # Home: pipeline cards, stat strip, hero
+│   │   ├── pipeline/[id]/       # Pipeline detail + SSE stream UI
+│   │   ├── compose/             # Pipeline Composer: build custom workflows
+│   │   ├── proof/               # On-chain proof page with TX hashes
+│   │   └── api/
+│   │       ├── agent/           # 4 agent endpoints (crypto-price, fear-greed, risk-eval, market-data)
+│   │       └── pipeline/        # Backend routes (register, fund, trigger, state, stream, reset, simulate)
+│   ├── lib/
+│   │   ├── relay-coordinator.ts # Off-chain relay: listens for StepCompleted, calls dispatchNext
+│   │   ├── relay-executor.ts    # Per-agent-type execution logic
+│   │   ├── pipeline-service.ts  # On-chain reads via ethers.js
+│   │   └── event-bus.ts         # Global SSE event bus for real-time updates
+│   └── components/              # LiveBlock, SiteNav, StepCard
 ├── scripts/
-│   └── seed-demo.ts            # Seeds funded demo pipelines on Shannon
-├── test/                       # Forge test suite (47 tests)
+│   └── seed-demo.ts             # Seeds funded demo pipelines on Shannon
+├── test/                        # Foundry test suite (47 tests)
 └── submission/
-    └── proof.md                # On-chain TX hashes for submission
+    └── proof.md                 # On-chain TX hashes for hackathon submission
 ```
 
 ---
 
-Built for the [Somnia Agentathon](https://somnia.network) (Encode Club × Somnia).
+Somnia Shannon testnet: Chain ID 50312 | RPC `https://dream-rpc.somnia.network` | Explorer `shannon-explorer.somnia.network`
+
+Built for the [Somnia Agentathon](https://www.encode.club/somnia-agentathon) (Encode Club x Somnia).
 
 ## License
 

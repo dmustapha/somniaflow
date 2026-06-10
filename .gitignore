@@ -12,6 +12,8 @@ node_modules/
 cache/
 broadcast/
 artifacts/
+lib/
+out/
 
 # Vercel
 .vercel
@@ -25,19 +27,6 @@ Thumbs.db
 next-env.d.ts
 
 # Local
-PULSE.md
-.conductor-state.json
-.deploy-state.json
-pipeline-log.md
-.debug-state.json
-.wire-state.json
-.verify-state.json
-.stress-test-state.json
-.polish-state.json
-.design-forge-state.json
-.livetest-state.json
-
-# Build/skill state files
-.build-state.json
-.forge-state.json
-.conductor-lock/
+.claude/
+*.log
+.gas-snapshot
