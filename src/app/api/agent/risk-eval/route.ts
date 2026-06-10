@@ -27,37 +27,61 @@ function computeRiskScore(input: RiskInput): {
   const volChange = input.volume_change ?? 0;
   const threshold = input.threshold ?? 60;
 
-  // Component scores (0-100 each)
-  // Price momentum: positive change = higher score
-  const momentumScore = Math.min(100, Math.max(0, 50 + change * 5));
-  // Sentiment: fear = low score, greed = high
-  const sentimentScore = fg;
-  // Volume: higher volume change = more conviction
-  const volumeScore = Math.min(100, Math.max(0, 50 + volChange * 2));
-  // Volatility penalty: extreme changes reduce confidence
-  const volatilityPenalty = Math.min(30, Math.abs(change) > 10 ? Math.abs(change) - 10 : 0);
+  // 4-component risk scoring (0-100 total)
+  // 1. Sentiment Risk (0-40): extreme fear or greed = higher risk
+  let sentimentRisk = 15; // neutral baseline
+  if (fg < 20) sentimentRisk = 40;
+  else if (fg < 35) sentimentRisk = 30;
+  else if (fg < 50) sentimentRisk = 15;
+  else if (fg < 65) sentimentRisk = 5;
+  else if (fg < 80) sentimentRisk = 15;
+  else sentimentRisk = 35;
 
-  const rawScore = (momentumScore * 0.35 + sentimentScore * 0.35 + volumeScore * 0.3) - volatilityPenalty;
+  // 2. Price Stability Risk (0-30)
+  let priceRisk = 10; // base
+  if (price > 0) {
+    const nearest1k = Math.round(price / 1000) * 1000;
+    if (Math.abs(price - nearest1k) / nearest1k < 0.005) priceRisk += 10;
+    if (price > 100000) priceRisk += 5;
+    if (price < 1000 && price > 0) priceRisk += 5;
+  }
+
+  // 3. Timing Risk (0-15)
+  const now = new Date();
+  const day = now.getUTCDay();
+  const hour = now.getUTCHours();
+  let timingRisk = 0;
+  if (day === 0 || day === 6) timingRisk += 10;
+  if (hour >= 20 || hour < 8) timingRisk += 5;
+
+  // 4. Volatility Proxy (0-15): uses 24h change and volume change as proxy
+  let volatilityRisk = 0;
+  const absChange = Math.abs(change);
+  if (absChange > 10) volatilityRisk = 15;
+  else if (absChange > 5) volatilityRisk = 8;
+  if (Math.abs(volChange) > 20) volatilityRisk = Math.min(15, volatilityRisk + 5);
+
+  const rawScore = sentimentRisk + priceRisk + timingRisk + volatilityRisk;
   const score = Math.round(Math.min(100, Math.max(0, rawScore)));
 
-  const decision = score >= threshold ? "EXECUTE" : "SKIP";
+  // Higher score = higher risk = SKIP. Lower score = safer = EXECUTE
+  const decision = score < threshold ? "EXECUTE" : "SKIP";
 
   const confidence = Math.abs(score - threshold) > 20 ? "HIGH"
     : Math.abs(score - threshold) > 10 ? "MEDIUM" : "LOW";
 
   const parts: string[] = [];
-  if (change > 0) parts.push(`positive 24h momentum (+${change.toFixed(1)}%)`);
-  else parts.push(`negative 24h momentum (${change.toFixed(1)}%)`);
-  if (fg > 60) parts.push(`greed sentiment (${fg})`);
-  else if (fg < 40) parts.push(`fear sentiment (${fg})`);
-  else parts.push(`neutral sentiment (${fg})`);
-  parts.push(`risk score ${score}/${threshold} threshold`);
+  parts.push(`sentiment risk ${sentimentRisk}/40 (F&G: ${fg})`);
+  parts.push(`price stability ${priceRisk}/30`);
+  parts.push(`timing ${timingRisk}/15`);
+  parts.push(`volatility ${volatilityRisk}/15`);
+  parts.push(`total risk ${score}/${threshold} threshold`);
 
-  const reasoning = `${parts.join(". ")}. ${decision === "EXECUTE" ? "Conditions favor execution." : "Conditions suggest waiting."}`;
+  const reasoning = `${parts.join(". ")}. ${decision === "EXECUTE" ? "Risk within acceptable range." : "Risk exceeds threshold, suggest waiting."}`;
 
   return {
     score,
-    components: { momentum: momentumScore, sentiment: sentimentScore, volume: volumeScore, volatility_penalty: volatilityPenalty },
+    components: { sentiment_risk: sentimentRisk, price_stability: priceRisk, timing: timingRisk, volatility: volatilityRisk },
     decision,
     reasoning,
     confidence,

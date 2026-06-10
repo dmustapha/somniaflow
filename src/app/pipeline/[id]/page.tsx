@@ -31,26 +31,60 @@ function stepSublabel(def: PipelineStepDef): string {
   return AGENT_LABELS[def.agentType]?.sublabel ?? "";
 }
 
-/** Smart result formatter: detect numbers, JSON, and format accordingly */
+/** Smart result formatter: detect type and format accordingly
+ *  Handles: number, json-object, json-array, decision, error, url, text */
 function smartFormatResult(raw: string): string {
   if (!raw) return raw;
+  const trimmed = raw.trim();
+
+  // Error result
+  if (trimmed.startsWith("ERROR:") || trimmed.startsWith("error:")) {
+    return trimmed;
+  }
+
+  // Decision result (handled separately by WordReveal, but format nicely if shown raw)
+  if (trimmed.includes("DECISION:")) {
+    return trimmed;
+  }
+
+  // URL result
+  if (/^https?:\/\/\S+$/.test(trimmed)) {
+    return trimmed;
+  }
+
   // Pure number — format with commas
-  const num = Number(raw);
-  if (!isNaN(num) && raw.trim() !== "") {
+  const num = Number(trimmed);
+  if (!isNaN(num) && trimmed !== "") {
     return num >= 1000 ? `$${num.toLocaleString()}` : String(num);
   }
-  // Try JSON — show summary or compact
+
+  // Try JSON
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      // JSON array — show count + first items
+      const preview = parsed.slice(0, 3).map((item: unknown) =>
+        typeof item === "object" && item !== null
+          ? Object.entries(item as Record<string, unknown>).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(", ")
+          : String(item)
+      ).join(" | ");
+      return `[${parsed.length} items] ${preview}${parsed.length > 3 ? " ..." : ""}`;
+    }
     if (typeof parsed === "object" && parsed !== null) {
-      // If it has a summary-like key, use that
       const keys = Object.keys(parsed);
-      if (keys.length <= 4) {
-        return keys.map(k => `${k}: ${typeof parsed[k] === "number" ? parsed[k].toLocaleString() : parsed[k]}`).join(" · ");
+      // Compact key:value for small objects
+      if (keys.length <= 5) {
+        return keys.map(k => {
+          const v = (parsed as Record<string, unknown>)[k];
+          if (typeof v === "number") return `${k}: ${v >= 1000 ? v.toLocaleString() : v}`;
+          if (typeof v === "string" && v.length > 40) return `${k}: ${v.substring(0, 40)}...`;
+          return `${k}: ${v}`;
+        }).join(" · ");
       }
-      return JSON.stringify(parsed, null, 2).substring(0, 300);
+      return JSON.stringify(parsed, null, 2).substring(0, 400);
     }
   } catch { /* not JSON */ }
+
   // Default: truncate long strings
   return raw.length > 200 ? raw.substring(0, 200) + "..." : raw;
 }

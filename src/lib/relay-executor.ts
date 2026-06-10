@@ -18,7 +18,7 @@ export const AGENT_TYPE_EXTERNAL   = 3;
  * jsonPath uses dot notation: "price" or "data.0.price"
  */
 export async function executeJsonApi(inputTemplate: string, prevResult: string): Promise<string> {
-  const interpolated = inputTemplate.replace("{prevResult}", prevResult);
+  const interpolated = interpolateTemplate(inputTemplate, prevResult);
   const parts        = interpolated.split("|");
   const url          = parts[0]?.trim();
   const jsonPath     = parts[1]?.trim() ?? "";
@@ -136,7 +136,7 @@ export async function executeLlmInference(
 ): Promise<string> {
   if (!claudeApiKey) throw new Error("LLM: ANTHROPIC_API_KEY not set");
 
-  const prompt = inputTemplate.replace("{prevResult}", prevResult);
+  const prompt = interpolateTemplate(inputTemplate, prevResult);
 
   const body = {
     model:      CLAUDE_MODEL,
@@ -183,7 +183,7 @@ export async function executeLlmParseWebsite(
   prevResult:    string,
   claudeApiKey:  string
 ): Promise<string> {
-  const interpolated = inputTemplate.replace("{prevResult}", prevResult);
+  const interpolated = interpolateTemplate(inputTemplate, prevResult);
   const parts        = interpolated.split("|");
   const url              = parts[0]?.trim();
   const extractionPrompt = parts[1]?.trim() ?? "Extract the main content and key data from this page.";

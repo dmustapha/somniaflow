@@ -239,7 +239,7 @@ export default function ComposePage() {
                     )}
                   </div>
 
-                  {/* Agent picker — live from Somnia registry */}
+                  {/* Agent picker — tiered by category */}
                   <div style={{ marginBottom: "12px" }}>
                     <div style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -262,28 +262,109 @@ export default function ComposePage() {
                         </span>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      {agents.map(a => (
-                        <button
-                          key={a.id}
-                          onClick={() => updateStep(step._id, {
-                            agentType: a.executionType,
-                            selectedAgentId: a.id,
-                          })}
-                          title={a.description}
-                          style={{
-                            fontSize: "11px", fontFamily: "var(--font-mono)",
-                            padding: "5px 12px", cursor: "pointer",
-                            border: `1px solid ${step.selectedAgentId === a.id ? "var(--brand)" : "var(--border)"}`,
-                            background: step.selectedAgentId === a.id ? "var(--brand-dim)" : "transparent",
-                            color: step.selectedAgentId === a.id ? "var(--brand)" : "var(--text-lo)",
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          {a.name}
-                        </button>
-                      ))}
-                    </div>
+
+                    {/* SomniaFlow agents — green highlight */}
+                    {(() => {
+                      const sfAgents = agents.filter(a => a.category === "somniaflow");
+                      if (sfAgents.length === 0) return null;
+                      return (
+                        <div style={{ marginBottom: "8px" }}>
+                          <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--ok)", letterSpacing: "0.1em", marginBottom: "4px" }}>
+                            SOMNIAFLOW
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {sfAgents.map(a => (
+                              <button
+                                key={a.id}
+                                onClick={() => updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id })}
+                                title={a.description}
+                                style={{
+                                  fontSize: "11px", fontFamily: "var(--font-mono)",
+                                  padding: "5px 12px", cursor: "pointer",
+                                  border: `1px solid ${step.selectedAgentId === a.id ? "var(--ok)" : "rgba(74,222,128,0.25)"}`,
+                                  background: step.selectedAgentId === a.id ? "rgba(74,222,128,0.1)" : "transparent",
+                                  color: step.selectedAgentId === a.id ? "var(--ok)" : "rgba(74,222,128,0.7)",
+                                  transition: "all 0.15s",
+                                }}
+                              >
+                                {a.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Platform agents — brand highlight */}
+                    {(() => {
+                      const plAgents = agents.filter(a => a.category === "platform");
+                      if (plAgents.length === 0) return null;
+                      return (
+                        <div style={{ marginBottom: "8px" }}>
+                          <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--brand)", letterSpacing: "0.1em", marginBottom: "4px" }}>
+                            PLATFORM
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {plAgents.map(a => (
+                              <button
+                                key={a.id}
+                                onClick={() => updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id })}
+                                title={a.description}
+                                style={{
+                                  fontSize: "11px", fontFamily: "var(--font-mono)",
+                                  padding: "5px 12px", cursor: "pointer",
+                                  border: `1px solid ${step.selectedAgentId === a.id ? "var(--brand)" : "var(--border)"}`,
+                                  background: step.selectedAgentId === a.id ? "var(--brand-dim)" : "transparent",
+                                  color: step.selectedAgentId === a.id ? "var(--brand)" : "var(--text-lo)",
+                                  transition: "all 0.15s",
+                                }}
+                              >
+                                {a.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Community agents (AETHON etc) — dimmed, non-callable shown differently */}
+                    {(() => {
+                      const comAgents = agents.filter(a => a.category === "community");
+                      if (comAgents.length === 0) return null;
+                      return (
+                        <div style={{ marginBottom: "4px" }}>
+                          <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "rgba(96,165,250,0.7)", letterSpacing: "0.1em", marginBottom: "4px" }}>
+                            COMMUNITY ({comAgents.length})
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {comAgents.map(a => (
+                              <button
+                                key={a.id}
+                                onClick={() => {
+                                  if (a.callable) {
+                                    updateStep(step._id, { agentType: a.executionType, selectedAgentId: a.id });
+                                  }
+                                }}
+                                title={a.callable ? a.description : `${a.description} (no callable endpoint)`}
+                                style={{
+                                  fontSize: "11px", fontFamily: "var(--font-mono)",
+                                  padding: "5px 12px",
+                                  cursor: a.callable ? "pointer" : "default",
+                                  border: `1px solid ${step.selectedAgentId === a.id ? "rgba(96,165,250,0.6)" : "rgba(96,165,250,0.15)"}`,
+                                  background: step.selectedAgentId === a.id ? "rgba(96,165,250,0.08)" : "transparent",
+                                  color: a.callable ? "rgba(96,165,250,0.7)" : "rgba(96,165,250,0.35)",
+                                  opacity: a.callable ? 1 : 0.6,
+                                  transition: "all 0.15s",
+                                }}
+                              >
+                                {a.name}{!a.callable ? " (view)" : ""}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {selectedAgent && (
                       <div style={{
                         fontSize: "11px", color: "var(--text-lo)",

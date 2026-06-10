@@ -82,7 +82,14 @@ export async function startRelayCoordinator(): Promise<void> {
         // Read pipeline state to get the step's inputTemplate and prevResult
         const state      = await contract.getPipelineState(pipelineId);
         const results: string[]  = state.stepResults ?? state[5] ?? [];
-        const prevResult = stepN > 0 ? (results[stepN - 1] ?? "") : "";
+        let prevResult = stepN > 0 ? (results[stepN - 1] ?? "") : "";
+
+        // Unwrap conditional wrapper if present (Issue 3 fix)
+        const originalMarker = "ORIGINAL_RESULT: ";
+        const markerIdx = prevResult.indexOf(originalMarker);
+        if (markerIdx >= 0) {
+          prevResult = prevResult.substring(markerIdx + originalMarker.length);
+        }
 
         // Re-read step definitions from the full pipeline state
         // Note: getPipelineState only returns PipelineStateView — no step definitions.
@@ -111,6 +118,20 @@ export async function startRelayCoordinator(): Promise<void> {
               break;
             default:
               throw new Error(`Unknown agentType: ${typeN}`);
+          }
+        }
+
+        // Issue 3 fix: wrap non-DECISION results when next step has conditionalOnPrev
+        const cachedSteps = _stepCache.get(pid);
+        const nextStepIdx = stepN + 1;
+        if (cachedSteps && nextStepIdx < cachedSteps.length) {
+          const nextStep = cachedSteps[nextStepIdx];
+          if (nextStep?.conditionalOnPrev && !result.includes("DECISION:")) {
+            if (result.trim() && !result.startsWith("ERROR:")) {
+              result = `DECISION: EXECUTE\nREASONING: Previous step returned valid data.\nCONFIDENCE: HIGH\nORIGINAL_RESULT: ${result}`;
+            } else {
+              result = `DECISION: SKIP\nREASONING: Previous step returned empty or error result.\nCONFIDENCE: HIGH`;
+            }
           }
         }
 
@@ -147,7 +168,7 @@ export async function startRelayCoordinator(): Promise<void> {
 // -------------------------------------------------------------------------
 
 // Cache: pipelineId → steps array (populated on first StepDispatched per pipeline)
-const _stepCache: Map<string, Array<{ agentType: number; inputTemplate: string }>> = new Map();
+const _stepCache: Map<string, Array<{ agentType: number; inputTemplate: string; conditionalOnPrev: boolean }>> = new Map();
 
 async function getStepInputTemplate(
   contract:   Contract,
@@ -163,9 +184,10 @@ async function getStepInputTemplate(
 
   // Fetch all step definitions via getPipelineSteps()
   const steps = await contract.getPipelineSteps(pipelineId);
-  const mapped = steps.map((s: { agentType: bigint | number; inputTemplate: string }) => ({
-    agentType:     Number(s.agentType),
-    inputTemplate: s.inputTemplate,
+  const mapped = steps.map((s: { agentType: bigint | number; inputTemplate: string; conditionalOnPrev: boolean }) => ({
+    agentType:         Number(s.agentType),
+    inputTemplate:     s.inputTemplate,
+    conditionalOnPrev: Boolean(s.conditionalOnPrev),
   }));
   _stepCache.set(pid, mapped);
   return mapped[stepN]?.inputTemplate ?? "";

@@ -46,6 +46,10 @@ export interface SomniaAgent {
   typeLabel:     string;
   // Manifest for external agents (resolved from ipfsMetadata or endpoint)
   manifest?:     AgentManifest;
+  // Visual category for Composer: somniaflow (our agents), community (AETHON etc), platform (canonical types)
+  category?:     "somniaflow" | "community" | "platform";
+  // Whether the agent has a callable endpoint
+  callable?:     boolean;
 }
 
 // Map on-chain agentType → Platform execution type
@@ -116,17 +120,61 @@ export async function fetchSomniaAgents(): Promise<SomniaAgent[]> {
     }
   }
 
-  // Override executionType for agents with somniaflow-agent-v1 manifests in ipfsMetadata
-  for (const a of agents) {
-    if (a.ipfsMetadata) {
-      try {
+  // Resolve manifests from ipfsMetadata (inline JSON, HTTP URL, IPFS hash)
+  await Promise.allSettled(agents.map(async (a) => {
+    if (!a.ipfsMetadata) return;
+    try {
+      // 1. Inline JSON manifest
+      if (a.ipfsMetadata.trimStart().startsWith("{")) {
         const meta = JSON.parse(a.ipfsMetadata);
-        if (meta.version === "somniaflow-agent-v1" && meta.endpoint) {
+        if (meta.version?.startsWith("somniaflow-agent") && meta.endpoint) {
           a.executionType = 3;
-          a.typeLabel = TYPE_LABELS[3];
+          a.typeLabel = "External";
           a.manifest = meta as AgentManifest;
         }
-      } catch { /* not JSON — skip */ }
+      }
+      // 2. HTTP URL (e.g. AETHON agents store manifest URLs)
+      else if (a.ipfsMetadata.startsWith("http")) {
+        const res = await fetch(a.ipfsMetadata, { signal: AbortSignal.timeout(5000) });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.version?.startsWith("somniaflow-agent") && data.endpoint) {
+            a.executionType = 3;
+            a.typeLabel = "External";
+            a.manifest = data as AgentManifest;
+          } else if (data.name || data.description) {
+            // Non-somniaflow manifest (AETHON-style) — store for display but don't make callable
+            a.manifest = { ...data, version: data.version ?? "unknown", endpoint: "", method: "", inputSchema: {}, outputSchema: {}, resultType: "" } as AgentManifest;
+          }
+        }
+      }
+      // 3. IPFS hash
+      else if (a.ipfsMetadata.startsWith("Qm") || a.ipfsMetadata.startsWith("bafy")) {
+        const gateway = `https://gateway.pinata.cloud/ipfs/${a.ipfsMetadata}`;
+        const res = await fetch(gateway, { signal: AbortSignal.timeout(5000) });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.version?.startsWith("somniaflow-agent") && data.endpoint) {
+            a.executionType = 3;
+            a.typeLabel = "External";
+            a.manifest = data as AgentManifest;
+          }
+        }
+      }
+    } catch { /* manifest resolution is best-effort */ }
+  }));
+
+  // Set category and callable flag for on-chain agents
+  for (const a of agents) {
+    if (a.manifest?.endpoint) {
+      a.callable = true;
+      a.category = "community";
+    } else if (a.manifest) {
+      a.callable = false;
+      a.category = "community"; // has manifest but no callable endpoint (e.g. AETHON)
+    } else {
+      a.callable = false;
+      a.category = "community";
     }
   }
 
@@ -158,6 +206,7 @@ function getDemoAgents(): SomniaAgent[] {
       isActive: true, ipfsMetadata: "", registeredAt: 0,
       executionType: 3, typeLabel: "External",
       manifest: { version: "somniaflow-agent-v1", name: "Crypto Price Agent", description: "Real-time crypto prices", endpoint: `${base}/api/agent/crypto-price`, method: "POST", inputSchema: {}, outputSchema: {}, resultType: "json" },
+      category: "somniaflow", callable: true,
     },
     {
       id: 1002, name: "Fear & Greed Agent",
@@ -166,6 +215,7 @@ function getDemoAgents(): SomniaAgent[] {
       isActive: true, ipfsMetadata: "", registeredAt: 0,
       executionType: 3, typeLabel: "External",
       manifest: { version: "somniaflow-agent-v1", name: "Fear & Greed Agent", description: "Market sentiment", endpoint: `${base}/api/agent/fear-greed`, method: "POST", inputSchema: {}, outputSchema: {}, resultType: "number" },
+      category: "somniaflow", callable: true,
     },
     {
       id: 1003, name: "Risk Evaluation Agent",
@@ -174,6 +224,7 @@ function getDemoAgents(): SomniaAgent[] {
       isActive: true, ipfsMetadata: "", registeredAt: 0,
       executionType: 3, typeLabel: "External",
       manifest: { version: "somniaflow-agent-v1", name: "Risk Evaluation Agent", description: "Risk scoring", endpoint: `${base}/api/agent/risk-eval`, method: "POST", inputSchema: {}, outputSchema: {}, resultType: "decision" },
+      category: "somniaflow", callable: true,
     },
     {
       id: 1004, name: "Market Data Agent",
@@ -182,6 +233,7 @@ function getDemoAgents(): SomniaAgent[] {
       isActive: true, ipfsMetadata: "", registeredAt: 0,
       executionType: 3, typeLabel: "External",
       manifest: { version: "somniaflow-agent-v1", name: "Market Data Agent", description: "Market aggregator", endpoint: `${base}/api/agent/market-data`, method: "POST", inputSchema: {}, outputSchema: {}, resultType: "json" },
+      category: "somniaflow", callable: true,
     },
   ];
 }
@@ -194,21 +246,21 @@ function getPlatformAgents(): SomniaAgent[] {
       description: "Fetches data from any public JSON endpoint and extracts a value. Powered by Somnia's consensus-validated JSON_API execution layer.",
       owner: "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
       isActive: true, ipfsMetadata: "", registeredAt: 0,
-      executionType: 0, typeLabel: "JSON API",
+      executionType: 0, typeLabel: "JSON API", category: "platform", callable: true,
     },
     {
       id: 1, name: "AI Inference Agent",
       description: "Runs deterministic LLM inference (Qwen3-30B) on Somnia's validator network. Produces structured EXECUTE/SKIP decisions with reasoning.",
       owner: "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
       isActive: true, ipfsMetadata: "", registeredAt: 0,
-      executionType: 1, typeLabel: "AI Inference",
+      executionType: 1, typeLabel: "AI Inference", category: "platform", callable: true,
     },
     {
       id: 2, name: "Web Parse Agent",
       description: "Scrapes any URL and extracts structured information using AI. Handles JavaScript-rendered content via Somnia's LLM_PARSE_WEBSITE execution layer.",
       owner: "0x037Bb9C718F3f7fe5eCBDB0b600D607b52706776",
       isActive: true, ipfsMetadata: "", registeredAt: 0,
-      executionType: 2, typeLabel: "Web Parse",
+      executionType: 2, typeLabel: "Web Parse", category: "platform", callable: true,
     },
   ];
 }
