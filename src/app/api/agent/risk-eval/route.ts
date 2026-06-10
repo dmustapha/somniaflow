@@ -12,6 +12,8 @@ interface RiskInput {
   fear_greed?: number;
   volume_change?: number;
   threshold?: number;
+  sentiment?: string;
+  prevResult?: string;
 }
 
 function computeRiskScore(input: RiskInput): {
@@ -88,9 +90,37 @@ function computeRiskScore(input: RiskInput): {
   };
 }
 
+function extractFromPrev(body: RiskInput): RiskInput {
+  // Try to extract typed fields from prevResult or sentiment strings
+  const raw = body.prevResult ?? body.sentiment ?? "";
+  if (!raw) return body;
+
+  // Attempt JSON parse (relay passes structured result as JSON)
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      ...body,
+      fear_greed: body.fear_greed ?? parsed.value ?? parsed.fear_greed,
+      price: body.price ?? parsed.price,
+      change_24h: body.change_24h ?? parsed.change_24h,
+      volume_change: body.volume_change ?? parsed.volume_change,
+    };
+  } catch { /* not JSON, try regex */ }
+
+  // Regex fallback: extract number from text like "Fear & Greed Index: 9 (Extreme Fear)"
+  if (body.fear_greed == null) {
+    const fgMatch = raw.match(/(?:index|f&g|fear.*greed)[:\s]+(\d+)/i)
+      ?? raw.match(/^(\d{1,3})$/);
+    if (fgMatch) return { ...body, fear_greed: parseInt(fgMatch[1], 10) };
+  }
+
+  return body;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body: RiskInput = await req.json().catch(() => ({}));
+    const rawBody: RiskInput = await req.json().catch(() => ({}));
+    const body = extractFromPrev(rawBody);
     const result = computeRiskScore(body);
 
     return NextResponse.json({

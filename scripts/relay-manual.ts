@@ -67,8 +67,10 @@ async function executeExternalAgent(inputTemplate: string, prevResult: string): 
   }
 
   const data = await res.json();
-  if (data.summary) return data.summary;
+  // Pass structured result as JSON so downstream agents can parse typed fields.
+  // Fall back to summary only if result is missing.
   if (data.result) return typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+  if (data.summary) return data.summary;
   return JSON.stringify(data);
 }
 
