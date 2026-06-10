@@ -4,7 +4,7 @@ import { ethers, Contract } from "ethers";
 export const dynamic = "force-dynamic";
 
 const HTTP_RPC         = "https://dream-rpc.somnia.network";
-const REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0xE1264BB2a3961d616D965b78873800682571eCbC").trim();
+const REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS ?? "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1").trim();
 const EXPLORER         = "https://shannon-explorer.somnia.network";
 
 const ABI = [

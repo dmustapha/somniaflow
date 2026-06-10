@@ -4,7 +4,7 @@ import { getPipelineState, getTransactionHistory, getStepDefinitions } from "@/l
 import { parsePipelineDecision } from "@/lib/parse-decision";
 import { SiteNav } from "@/components/SiteNav";
 
-const REGISTRY  = "0xE1264BB2a3961d616D965b78873800682571eCbC";
+const REGISTRY  = "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1";
 const EXPLORER  = "https://shannon-explorer.somnia.network";
 const CHAIN_ID  = 50312;
 
@@ -290,7 +290,7 @@ export default async function ProofPage() {
               Contract Address
             </div>
             <a
-              href={`${EXPLORER}/address/${REGISTRY || "0xE1264BB2a3961d616D965b78873800682571eCbC"}`}
+              href={`${EXPLORER}/address/${REGISTRY || "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1"}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -299,7 +299,7 @@ export default async function ProofPage() {
                 wordBreak: "break-all", lineHeight: 1.5,
               }}
             >
-              {REGISTRY || "0xE1264BB2a3961d616D965b78873800682571eCbC"} ↗
+              {REGISTRY || "0x7B19a2a65bC9604A40cc27F03C21A5329A7793e1"} ↗
             </a>
           </div>
         </div>
