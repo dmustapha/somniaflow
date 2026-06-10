@@ -14,6 +14,7 @@ const AGENT_LABELS: Record<number, { name: string; sublabel: string }> = {
   0: { name: "JSON API",         sublabel: "External data fetch" },
   1: { name: "AI Inference",     sublabel: "LLM reasoning" },
   2: { name: "Web Parse",        sublabel: "Web scrape + AI" },
+  3: { name: "External Agent",   sublabel: "HTTP agent call" },
 };
 
 function stepLabel(def: PipelineStepDef): string {
@@ -30,6 +31,30 @@ function stepSublabel(def: PipelineStepDef): string {
   return AGENT_LABELS[def.agentType]?.sublabel ?? "";
 }
 
+/** Smart result formatter: detect numbers, JSON, and format accordingly */
+function smartFormatResult(raw: string): string {
+  if (!raw) return raw;
+  // Pure number — format with commas
+  const num = Number(raw);
+  if (!isNaN(num) && raw.trim() !== "") {
+    return num >= 1000 ? `$${num.toLocaleString()}` : String(num);
+  }
+  // Try JSON — show summary or compact
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null) {
+      // If it has a summary-like key, use that
+      const keys = Object.keys(parsed);
+      if (keys.length <= 4) {
+        return keys.map(k => `${k}: ${typeof parsed[k] === "number" ? parsed[k].toLocaleString() : parsed[k]}`).join(" · ");
+      }
+      return JSON.stringify(parsed, null, 2).substring(0, 300);
+    }
+  } catch { /* not JSON */ }
+  // Default: truncate long strings
+  return raw.length > 200 ? raw.substring(0, 200) + "..." : raw;
+}
+
 interface StepState {
   status:         PipelineStepStatus;
   result?:        string;
@@ -39,6 +64,7 @@ interface StepState {
   sttCost?:       string;
   requestId?:     string;
   txHash?:        string;
+  sseAgentType?:  number; // from SSE events when stepDefs not loaded
 }
 
 function makeInitialSteps(count: number): StepState[] {
@@ -99,13 +125,17 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
         setSteps(makeInitialSteps(event.data.stepCount || stepCount));
         break;
 
-      case "step_dispatched":
+      case "step_dispatched": {
+        // Map SSE agent type string → numeric type for StepCard rendering
+        const AGENT_TYPE_MAP: Record<string, number> = { JSON_API: 0, LLM_INFERENCE: 1, LLM_PARSE_WEBSITE: 2, EXTERNAL: 3 };
+        const sseType = AGENT_TYPE_MAP[event.data.agentType] ?? 0;
         setSteps(prev => {
           const n = [...prev];
-          n[event.data.step] = { ...n[event.data.step], status: "pending", requestId: event.data.requestId };
+          n[event.data.step] = { ...n[event.data.step], status: "pending", requestId: event.data.requestId, sseAgentType: sseType };
           return n;
         });
         break;
+      }
 
       case "step_complete":
         setSteps(prev => {
@@ -123,12 +153,23 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
         break;
 
       case "decision": {
-        // Attach decision to the most recent LLM step (agentType 1), or last complete step
-        const llmIdx = stepDefs.findIndex(d => d.agentType === 1);
-        const targetIdx = llmIdx >= 0 ? llmIdx : 1;
+        // Attach decision to the step that produced it
+        // Find the most recently completed step with a DECISION result (any agent type)
         setSteps(prev => {
           const n = [...prev];
-          if (n[targetIdx]) n[targetIdx] = { ...n[targetIdx], decision: event.data };
+          // Search backwards for the most recently completed step with DECISION in result
+          let targetIdx = -1;
+          for (let i = n.length - 1; i >= 0; i--) {
+            if (n[i].status === "complete" && n[i].result?.includes("DECISION:") && !n[i].decision) {
+              targetIdx = i;
+              break;
+            }
+          }
+          // Fallback: find any LLM step
+          if (targetIdx < 0) targetIdx = stepDefs.findIndex(d => d.agentType === 1);
+          if (targetIdx >= 0 && n[targetIdx]) {
+            n[targetIdx] = { ...n[targetIdx], decision: event.data };
+          }
           return n;
         });
         break;
@@ -222,14 +263,14 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
 
         if (state.status === "Idle" || !state.stepResults?.length) return;
 
-        const count = state.steps?.length || state.stepStatuses?.length || 3;
+        const count = state.steps?.length || state.stepStatuses?.length || 4;
         setSteps(Array.from({ length: count }, (_, i) => {
-          // Find LLM step (agentType 1) to attach decision
-          const isLlmStep = state.steps?.[i]?.agentType === 1;
+          // Detect DECISION format in any step result (LLM or external risk-eval)
+          const hasDecision = state.stepResults?.[i]?.includes("DECISION:");
           return {
             status: (state.stepStatuses?.[i] ?? "idle") as PipelineStepStatus,
             result: state.stepResults?.[i] || undefined,
-            decision: isLlmStep && state.stepResults?.[i]
+            decision: hasDecision
               ? parsePipelineDecision(state.stepResults[i])
               : undefined,
           };
@@ -361,7 +402,7 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                 <div key={i}>
                   <StepCard
                     index={i}
-                    agentType={def?.agentType ?? 0}
+                    agentType={def?.agentType ?? step.sseAgentType ?? 0}
                     status={step.status}
                     result={step.result}
                     streamingText={step.streamingText}
@@ -370,11 +411,15 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
                     sttCost={step.sttCost}
                     requestId={step.requestId}
                     txHash={step.txHash}
-                    label={def ? stepLabel(def) : `Step ${i + 1}`}
-                    sublabel={def ? stepSublabel(def) : undefined}
-                    conditional={def?.conditionalOnPrev ? "Only runs if previous step succeeded" : undefined}
-                    formatResult={undefined}
-                    pendingCopy={def?.agentType === 1 ? "AI analyzing data..." : "Fetching data..."}
+                    label={def ? stepLabel(def) : (AGENT_LABELS[step.sseAgentType ?? 0]?.name ?? `Step ${i + 1}`)}
+                    sublabel={def ? stepSublabel(def) : (AGENT_LABELS[step.sseAgentType ?? 0]?.sublabel ?? undefined)}
+                    conditional={def?.conditionalOnPrev ? "Only runs if previous step decided EXECUTE" : undefined}
+                    formatResult={smartFormatResult}
+                    pendingCopy={
+                      (def?.agentType ?? step.sseAgentType) === 1 ? "AI analyzing data..."
+                      : (def?.agentType ?? step.sseAgentType) === 3 ? "Calling external agent..."
+                      : "Fetching data..."
+                    }
                   />
                   {i < steps.length - 1 && <div className="sf-connector" />}
                 </div>

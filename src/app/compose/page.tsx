@@ -21,9 +21,22 @@ const TYPE_CONFIG: Record<number, { placeholder: string; hint: string }> = {
     placeholder: "https://example.com|Extract the main headline and key metrics|0",
     hint: "Format: url|extractionPrompt|0",
   },
+  3: {
+    placeholder: 'EXTERNAL|/api/agent/crypto-price|{"symbol":"eth"}',
+    hint: 'Format: EXTERNAL|endpoint_url|json_body — use {prevResult.field} for typed data from previous steps',
+  },
 };
 
 const EXAMPLES = [
+  {
+    name: "Market Intelligence (External Agents)",
+    steps: [
+      { agentType: 3 as const, inputTemplate: 'EXTERNAL|/api/agent/crypto-price|{"symbol":"eth"}', conditionalOnPrev: false, maxRetries: 2 },
+      { agentType: 3 as const, inputTemplate: 'EXTERNAL|/api/agent/fear-greed|{}', conditionalOnPrev: false, maxRetries: 2 },
+      { agentType: 3 as const, inputTemplate: 'EXTERNAL|/api/agent/risk-eval|{"change_24h":{prevResult.result.change_24h},"fear_greed":{prevResult.result.value}}', conditionalOnPrev: false, maxRetries: 1 },
+      { agentType: 1 as const, inputTemplate: "Market data: {prevResult}. Provide final analysis and EXECUTE/SKIP decision based on the risk evaluation above.", conditionalOnPrev: true, maxRetries: 2 },
+    ],
+  },
   {
     name: "ETH Price Rebalancing",
     steps: [
@@ -49,7 +62,7 @@ interface StepDraft extends PipelineStepInput {
 
 let idCounter = 0;
 
-function newStep(agentType: 0 | 1 | 2 = 0): StepDraft {
+function newStep(agentType: 0 | 1 | 2 | 3 = 0): StepDraft {
   return { _id: ++idCounter, agentType, inputTemplate: "", conditionalOnPrev: false, maxRetries: 2 };
 }
 
@@ -207,7 +220,7 @@ export default function ComposePage() {
                         fontSize: "10px", fontFamily: "var(--font-mono)",
                         color: "var(--brand)",
                       }}>
-                        {selectedAgent?.name ?? ["JSON API", "AI Inference", "Web Parse"][step.agentType]}
+                        {selectedAgent?.name ?? ["JSON API", "AI Inference", "Web Parse", "External"][step.agentType]}
                       </span>
                     </div>
                     {steps.length > 1 && (
@@ -328,7 +341,7 @@ export default function ComposePage() {
                         onChange={e => updateStep(step._id, { conditionalOnPrev: e.target.checked })}
                         style={{ accentColor: "var(--brand)" }}
                       />
-                      Skip if previous step failed
+                      Conditional: only run if previous step decided EXECUTE
                     </label>
                     <label style={{
                       display: "flex", alignItems: "center", gap: "6px",

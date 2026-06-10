@@ -94,6 +94,7 @@ contract PipelineRegistry {
     uint8 public constant AGENT_TYPE_JSON_API  = 0;
     uint8 public constant AGENT_TYPE_LLM       = 1;
     uint8 public constant AGENT_TYPE_PARSE_WEB = 2; // [CRITIQUE E-5]
+    uint8 public constant AGENT_TYPE_EXTERNAL  = 3;
 
     // [VERIFIED] — _containsExecute() searches for this exact string
     bytes private constant EXECUTE_NEEDLE = bytes("DECISION: EXECUTE");
@@ -444,6 +445,19 @@ contract PipelineRegistry {
         Pipeline storage pipe = _pipelines[pipelineId];
         PipelineStep storage step = pipe.steps[stepIndex];
 
+        // External agents bypass Somnia Platform entirely — relay handles HTTP execution
+        if (step.agentType == AGENT_TYPE_EXTERNAL) {
+            uint256 fakeRequestId = uint256(keccak256(
+                abi.encodePacked(pipelineId, stepIndex, block.number)
+            ));
+            _requestToPipeline[fakeRequestId] = pipelineId;
+            pipe.pendingRequestId             = fakeRequestId;
+            pipe.stepStatuses[stepIndex]      = StepStatus.Pending;
+            emit StepCostEstimated(pipelineId, stepIndex, 0);
+            emit StepDispatched(pipelineId, stepIndex, step.agentType, fakeRequestId);
+            return;
+        }
+
         string memory prevResult = stepIndex > 0 ? pipe.stepResults[stepIndex - 1] : "";
         string memory input      = _interpolate(step.inputTemplate, prevResult);
         bytes  memory payload    = _buildPayload(step.agentType, input);
@@ -520,6 +534,7 @@ contract PipelineRegistry {
     }
 
     function _calcDeposit(uint8 agentType) internal view returns (uint256) {
+        if (agentType == AGENT_TYPE_EXTERNAL) return 0; // External agents cost zero STT
         uint256 reserveFloor;
         try PLATFORM.getRequestDeposit() returns (uint256 floor) {
             reserveFloor = floor;

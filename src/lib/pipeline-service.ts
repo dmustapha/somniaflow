@@ -117,7 +117,7 @@ export async function startEventListener(): Promise<void> {
     if (!_stepDispatchTimes.has(id)) _stepDispatchTimes.set(id, new Map());
     _stepDispatchTimes.get(id)!.set(stepNum, Date.now());
 
-    const agentName = agentType === 1 ? "LLM_INFERENCE" : agentType === 2 ? "LLM_PARSE_WEBSITE" : "JSON_API";
+    const agentName = agentType === 1 ? "LLM_INFERENCE" : agentType === 2 ? "LLM_PARSE_WEBSITE" : agentType === 3 ? "EXTERNAL" : "JSON_API";
     pipelineBus.emit(id, {
       type: "step_dispatched",
       data: { step: stepNum, agentType: agentName, requestId: requestId.toString(), timestamp: Date.now() },
@@ -142,17 +142,19 @@ export async function startEventListener(): Promise<void> {
     if (!_stepTxHashes.has(id)) _stepTxHashes.set(id, new Map());
     _stepTxHashes.get(id)!.set(stepNum, txHash);
 
-    if (stepNum === 1) {
+    // Detect DECISION format in any step result (LLM or external risk-eval)
+    const hasDecision = result.includes("DECISION: EXECUTE") || result.includes("DECISION: SKIP");
+    if (hasDecision) {
       // Emit step_reasoning first so WordReveal animation starts
       pipelineBus.emit(id, {
         type: "step_reasoning",
-        data: { step: 1, chunk: result },
+        data: { step: stepNum, chunk: result },
       });
-      // Give React one render cycle before transitioning to complete (FIX-P3: WordReveal race fix)
+      // Give React one render cycle before transitioning to complete
       setTimeout(() => {
         pipelineBus.emit(id, {
           type: "step_complete",
-          data: { step: 1, result, durationMs: calcDuration(id, 1), sttCost: getStepCost(id, 1), txHash },
+          data: { step: stepNum, result, durationMs: calcDuration(id, stepNum), sttCost: getStepCost(id, stepNum), txHash },
         });
         pipelineBus.emit(id, { type: "decision", data: parsePipelineDecision(result) });
       }, 120);
@@ -279,7 +281,7 @@ export async function getStepDefinitions(pipelineId: string): Promise<PipelineSt
   const steps    = await contract.getPipelineSteps(BigInt(pipelineId));
   return Array.from(steps as ArrayLike<{ agentType: bigint | number; inputTemplate: string; conditionalOnPrev: boolean; maxRetries: bigint | number }>).map((s, i) => ({
     index:            i,
-    agentType:        Number(s.agentType) as 0 | 1 | 2,
+    agentType:        Number(s.agentType) as 0 | 1 | 2 | 3,
     inputTemplate:    s.inputTemplate,
     conditionalOnPrev: s.conditionalOnPrev,
     maxRetries:       Number(s.maxRetries),

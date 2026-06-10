@@ -14,9 +14,11 @@ import {
   AGENT_TYPE_JSON_API,
   AGENT_TYPE_LLM,
   AGENT_TYPE_PARSE_WEB,
+  AGENT_TYPE_EXTERNAL,
   executeJsonApi,
   executeLlmInference,
   executeLlmParseWebsite,
+  executeExternalAgent,
 } from "./relay-executor";
 
 const RELAY_ABI = [
@@ -90,20 +92,26 @@ export async function startRelayCoordinator(): Promise<void> {
         const inputTemplate = await getStepInputTemplate(contract, pipelineId, step);
 
         // Execute the agent step
+        // Detect EXTERNAL agents by template prefix (works even if on-chain agentType is 0)
         let result: string;
+        const isExternal = typeN === AGENT_TYPE_EXTERNAL || inputTemplate.startsWith("EXTERNAL|");
 
-        switch (typeN) {
-          case AGENT_TYPE_JSON_API:
-            result = await executeJsonApi(inputTemplate, prevResult);
-            break;
-          case AGENT_TYPE_LLM:
-            result = await executeLlmInference(inputTemplate, prevResult, claudeApiKey);
-            break;
-          case AGENT_TYPE_PARSE_WEB:
-            result = await executeLlmParseWebsite(inputTemplate, prevResult, claudeApiKey);
-            break;
-          default:
-            throw new Error(`Unknown agentType: ${typeN}`);
+        if (isExternal) {
+          result = await executeExternalAgent(inputTemplate, prevResult);
+        } else {
+          switch (typeN) {
+            case AGENT_TYPE_JSON_API:
+              result = await executeJsonApi(inputTemplate, prevResult);
+              break;
+            case AGENT_TYPE_LLM:
+              result = await executeLlmInference(inputTemplate, prevResult, claudeApiKey);
+              break;
+            case AGENT_TYPE_PARSE_WEB:
+              result = await executeLlmParseWebsite(inputTemplate, prevResult, claudeApiKey);
+              break;
+            default:
+              throw new Error(`Unknown agentType: ${typeN}`);
+          }
         }
 
         console.log(`[Relay] injecting result for reqId=${reqId} result="${result.substring(0, 80)}"`);

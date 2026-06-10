@@ -25,7 +25,7 @@ export type PipelineStepStatus =
   | "idle" | "pending" | "complete" | "failed" | "retrying" | "skipped";
 
 export interface PipelineStepInput {
-  agentType:        0 | 1 | 2;
+  agentType:        0 | 1 | 2 | 3;
   inputTemplate:    string;
   conditionalOnPrev: boolean;
   maxRetries:       number;
@@ -33,7 +33,7 @@ export interface PipelineStepInput {
 
 export interface PipelineStepDef {
   index:            number;
-  agentType:        0 | 1 | 2;
+  agentType:        0 | 1 | 2 | 3;
   inputTemplate:    string;
   conditionalOnPrev: boolean;
   maxRetries:       number;

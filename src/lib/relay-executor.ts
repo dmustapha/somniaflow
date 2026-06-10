@@ -10,6 +10,7 @@ const CLAUDE_MODEL   = "claude-haiku-4-5-20251001";
 export const AGENT_TYPE_JSON_API   = 0;
 export const AGENT_TYPE_LLM        = 1;
 export const AGENT_TYPE_PARSE_WEB  = 2;
+export const AGENT_TYPE_EXTERNAL   = 3;
 
 /**
  * Execute a JSON_API step: fetch data from a URL and extract a value.
@@ -51,6 +52,77 @@ export async function executeJsonApi(inputTemplate: string, prevResult: string):
   }
 
   return String(value);
+}
+
+/**
+ * Interpolate {prevResult} and dot-path {prevResult.field.subfield} in templates.
+ * Supports JSON-structured prevResult for typed data extraction between pipeline steps.
+ */
+export function interpolateTemplate(template: string, prevResult: string): string {
+  // First handle dot-path references like {prevResult.result.price}
+  let result = template.replace(/\{prevResult\.([^}]+)\}/g, (_match, path: string) => {
+    try {
+      const parsed = JSON.parse(prevResult);
+      let value: unknown = parsed;
+      for (const key of path.split(".")) {
+        if (value == null) return "";
+        value = (value as Record<string, unknown>)[key];
+      }
+      return value != null ? String(value) : "";
+    } catch {
+      return ""; // prevResult isn't JSON — dot-path can't resolve
+    }
+  });
+  // Then handle plain {prevResult}
+  result = result.replace("{prevResult}", prevResult);
+  return result;
+}
+
+/**
+ * Execute an EXTERNAL agent step: call an HTTP endpoint and return structured result.
+ * Input format: "EXTERNAL|endpoint_url|json_body"
+ * The endpoint must conform to somniaflow-agent-v1 manifest.
+ */
+export async function executeExternalAgent(
+  inputTemplate: string,
+  prevResult: string,
+): Promise<string> {
+  const interpolated = interpolateTemplate(inputTemplate, prevResult);
+  const parts = interpolated.split("|");
+
+  // Format: EXTERNAL|url|jsonBody
+  const marker = parts[0]?.trim();
+  const url = parts[1]?.trim();
+  const jsonBody = parts.slice(2).join("|").trim(); // rejoin in case body has pipes
+
+  if (marker !== "EXTERNAL" || !url) {
+    throw new Error(`EXTERNAL: invalid template format. Expected EXTERNAL|url|body, got: ${inputTemplate.substring(0, 80)}`);
+  }
+
+  let body: Record<string, unknown> = {};
+  if (jsonBody) {
+    try { body = JSON.parse(jsonBody); } catch { body = {}; }
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => res.statusText);
+    throw new Error(`EXTERNAL: HTTP ${res.status} from ${url}: ${errText.substring(0, 200)}`);
+  }
+
+  const data = await res.json();
+
+  // If the response has a summary field, use it as the string result
+  // Otherwise serialize the whole response
+  if (data.summary) return data.summary;
+  if (data.result) return typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+  return JSON.stringify(data);
 }
 
 /**

@@ -209,13 +209,13 @@ export function StepCard({
             </div>
           )}
 
-          {/* LLM streaming */}
-          {streamingText && agentType === 1 && status !== "complete" && (
+          {/* LLM streaming — works for LLM (1) and decision-producing external agents (3) */}
+          {streamingText && (agentType === 1 || agentType === 3) && status !== "complete" && (
             <WordReveal text={streamingText} />
           )}
 
-          {/* LLM decision card — structured display (replaces raw mono block) */}
-          {decision && status === "complete" && agentType === 1 && (
+          {/* Decision card — structured display for LLM or external agents that produce DECISION format */}
+          {decision && status === "complete" && (agentType === 1 || agentType === 3) && (
             <div style={{
               marginTop: "12px", padding: "14px 16px",
               border: `1px solid ${decision.decision === "EXECUTE" ? "rgba(74,222,128,0.25)" : "var(--border)"}`,
@@ -254,8 +254,8 @@ export function StepCard({
             </div>
           )}
 
-          {/* Result — JSON API (formatted) */}
-          {displayResult && status === "complete" && agentType !== 1 && (
+          {/* Result — non-decision results (JSON API, external non-decision, web parse) */}
+          {displayResult && status === "complete" && !decision && (
             <div style={{
               marginTop: "8px", fontFamily: "var(--font-mono)",
               fontSize: "13px", color: "var(--ok)", fontWeight: 600,
